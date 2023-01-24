@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[project]
+name = "rwkvstic"
+version = "0.0.1"
+authors = [
+  { name="Harrison Vanderbyl", email="harrison.vanderbyl@gmail.com" },
+]
+description = "A package for loading rwkv on a larger range of devices"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/harrisonvanderbyl/rwkvstic"
+"Bug Tracker" = "https://github.com/harrisonvanderbyl/rwkvstic/issues"
