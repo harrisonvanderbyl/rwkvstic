@@ -160,7 +160,7 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 
 
 class RWKVCudaQuantOps(RWKVPTOps):
-    def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None):
+    def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None, preQuantized=False):
         import torch
         import inquirer
         super().__init__(layers, embed, torch.bfloat16)
@@ -199,6 +199,10 @@ class RWKVCudaQuantOps(RWKVPTOps):
             choices=[1, 2, 4, 8, 16, 32, 64, 128, 256])])['chunksize'] if chunksize is None else chunksize
 
         def initTensor(x):
+
+            if preQuantized and isinstance(x, tuple):
+                return x[0].to(device=dev), x[1].to(dtype=runtimedtype, device=dev), x[2].to(dtype=runtimedtype, device=dev)
+
             if (len(x.shape) != 2):
                 return x.to(dtype=runtimedtype, device=dev)
 

@@ -3,14 +3,13 @@ import torch
 from rwkvstic.helpers.loadWeights import loadWeights
 from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends import Backends
-from rwkvstic.interOpLoaders import tflite, torchscript
+from rwkvstic.interOpLoaders import tflite, torchscript, prequantized
 from rwkvstic.rwkvMaster import RWKVMaster
 import torch
 import gc
 from typing import Tuple
 import inquirer
 import os
-
 # set torch threads to 8
 torch.set_num_threads(8)
 
@@ -21,7 +20,7 @@ def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
         files = os.listdir()
         # filter by ending in .pth
         files = [f for f in files if f.endswith(
-            ".pth") or f.endswith(".pt") or f.endswith(".tflite")]
+            ".pth") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth")]
 
         questions = [
             inquirer.List('file',
@@ -34,6 +33,8 @@ def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
         return torchscript.initTorchScriptFile(Path)
     elif Path.endswith(".tflite"):
         return tflite.initTFLiteFile(Path)
+    elif Path.endswith(".pqth"):
+        return prequantized.loadPreQuantized(Path)
 
     if mode is None:
         mode: str = inquirer.prompt([inquirer.List('mode',
