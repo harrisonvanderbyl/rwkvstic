@@ -160,12 +160,12 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 
 
 class RWKVCudaQuantOps(RWKVPTOps):
-    def __init__(self, layers, embed, *args, runtimedtype=None, uint4=False, useGPU=None, chunksize=None):
+    def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None):
         import torch
         import inquirer
         super().__init__(layers, embed, torch.bfloat16)
 
-        def QuantizeMatrix(x, runtimeDtype, device, uint4=False):
+        def QuantizeMatrix(x, runtimeDtype, device):
             rang = 255
             ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
             x = x.double()
@@ -203,7 +203,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
                 return x.to(dtype=runtimedtype, device=dev)
 
             splitmatrices = torch.chunk(x, chunksize, 1)
-            xx = [QuantizeMatrix(x, runtimedtype, dev, uint4)
+            xx = [QuantizeMatrix(x, runtimedtype, dev)
                   for x in splitmatrices]
             xxo = torch.stack([x[0] for x in xx])
             xx1 = torch.stack([x[1] for x in xx])
@@ -217,7 +217,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
         def matvec(x, y):
             splitVectors = y.reshape(chunksize, -1)
-            return QuantizedMatVec(x, splitVectors, runtimedtype, uint4)
+            return QuantizedMatVec(x, splitVectors, runtimedtype)
 
         self.matvec = matvec
 
