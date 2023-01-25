@@ -16,3 +16,16 @@ Backends: Dict[str, module] = {
     "export-tensorflow": RWKVTFExport,
     "pytorch-compatibility(cpu/debug)": RWKVPTCompatOps
 }
+
+
+TORCH = "pytorch(cpu/gpu)"
+JAX = "jax(cpu/gpu/tpu)"
+TF = "tensorflow(cpu/gpu)"
+TORCH_DEEPSPEED = "pytorch-deepspeed(gpu)"
+TORCH_QUANT = "pytorch-quant(gpu-8bit)"
+TORCH_STREAM = "pytorch-stream(gpu-config-vram)"
+TORCH_SPLIT = "pytorch-split(2xgpu)"
+TORCH_EXPORT = "export-torchscript"
+TF_EXPORT = "export-tensorflow"
+TORCH_COMPAT = "pytorch-compatibility(cpu/debug)"
+NUMPY = "numpy(cpu)"
