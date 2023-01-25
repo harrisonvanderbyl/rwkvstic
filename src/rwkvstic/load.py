@@ -1,17 +1,14 @@
 
-import torch
 from rwkvstic.helpers.loadWeights import loadWeights
 from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends import Backends
-from rwkvstic.interOpLoaders import tflite, torchscript, prequantized
+from rwkvstic.interOpLoaders import tflite, torchscript, prequantized, preJax
 from rwkvstic.rwkvMaster import RWKVMaster
-import torch
 import gc
 from typing import Tuple
 import inquirer
 import os
 # set torch threads to 8
-torch.set_num_threads(8)
 
 
 def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaster:
@@ -20,7 +17,7 @@ def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
         files = os.listdir()
         # filter by ending in .pth
         files = [f for f in files if f.endswith(
-            ".pth") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth")]
+            ".pth") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth") or f.endswith(".jax.npy")]
 
         questions = [
             inquirer.List('file',
@@ -28,6 +25,12 @@ def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
                           choices=files,
                           )]
         Path = inquirer.prompt(questions)["file"]
+    else:
+        if ("http" in Path):
+            fileName = Path.split("/")[-1]
+            if os.system("ls " + fileName):
+                os.system(f"wget {Path}")
+            Path = fileName
 
     if Path.endswith(".pt"):
         return torchscript.initTorchScriptFile(Path)
@@ -35,6 +38,8 @@ def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
         return tflite.initTFLiteFile(Path)
     elif Path.endswith(".pqth"):
         return prequantized.loadPreQuantized(Path)
+    elif Path.endswith(".jax.npy"):
+        return preJax.loadPreJax(Path)
 
     if mode is None:
         mode: str = inquirer.prompt([inquirer.List('mode',
@@ -45,7 +50,6 @@ def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
     ops, weights = loadWeights(mode, Path, *args, **kwargs)
 
     gc.collect()
-    torch.cuda.empty_cache()
 
     model = AgnostigRWKV(ops, weights)
     emptyState = ops.emptyState

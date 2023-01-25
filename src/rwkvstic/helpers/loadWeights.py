@@ -1,13 +1,14 @@
 
-import torch
+
 from rwkvstic.agnostic.backends import Backends
 from rwkvstic.agnostic.backends.base import module
-import torch
+
 from typing import Dict
 from tqdm import tqdm
 
 
 def loadWeights(mode, Path, *args, **kwargs):
+    import torch
     n_layer = 0
 
     w: Dict[str, torch.Tensor] = torch.load(

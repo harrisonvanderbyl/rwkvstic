@@ -11,7 +11,7 @@ import os
 torch.set_num_threads(8)
 
 
-def preQuantized(Path=None) -> RWKVMaster:
+def preJax(Path=None) -> RWKVMaster:
 
     if (Path == None):
         files = os.listdir()
@@ -21,16 +21,18 @@ def preQuantized(Path=None) -> RWKVMaster:
 
         questions = [
             inquirer.List('file',
-                          message="What model do you want to quantize?",
+                          message="What model do you want to convert to jax?",
                           choices=files,
                           )]
         Path = inquirer.prompt(questions)["file"]
 
-    mode = "pytorch-quant(gpu-8bit)"
+    mode = "jax(cpu/gpu/tpu)"
     ops, weights = loadWeights(
-        mode, Path, runtimedtype=torch.float32, chunksize=32, useGPU=False)
+        mode, Path)
 
     gc.collect()
     torch.cuda.empty_cache()
+    import jax
 
-    torch.save(weights, Path.replace(".pth", ".pqth"))
+    # save
+    jax.numpy.save(Path.replace(".pth", ".jax.npy"), weights)

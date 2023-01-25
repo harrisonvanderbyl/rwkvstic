@@ -37,10 +37,13 @@ class RWKVNumpyOps(RWKVOp.module):
 
 
 class RWKVJaxOps(RWKVOp.module):
-    def __init__(self, layers, embed):
+    def __init__(self, layers, embed, preJax=False):
         from jax import numpy as npjax
         super().__init__(layers, embed)
-        self.initTensor = lambda x: npjax.array(x.float().cpu().numpy())
+        if preJax:
+            self.initTensor = lambda x: npjax.array(x)
+        else:
+            self.initTensor = lambda x: npjax.array(x.float().cpu().numpy())
         self.sqrt = lambda x: npjax.sqrt(x)
         self.mean = lambda x: npjax.mean(x)
         self.relu = lambda x: npjax.maximum(x, 0)
