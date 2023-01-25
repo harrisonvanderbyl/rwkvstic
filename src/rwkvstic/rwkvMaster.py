@@ -1,6 +1,7 @@
 import torch
 import tqdm
 import rwkvstic.tokenizer as tokenizer
+from typing import List
 
 # this is for like, being useful
 
@@ -28,7 +29,7 @@ class RWKVMaster():
         self.initTensor = initTensor
         self.sampler = sampler
 
-    def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1):
+    def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1, stopStrings: List[str] = []):
         state = self.myState if state is None else state
         tolens = []
         for i in range(number):
@@ -42,7 +43,11 @@ class RWKVMaster():
                 self.lastToken = sampled
 
             tolens += [self.lastToken]
-        sampled = self.tokenizer.decode(tolens)
+            sampled = self.tokenizer.decode(tolens)
+            for stops in stopStrings:
+                if (sampled.endswith(stops)) and len(sampled > stops):
+                    break
+
         return {"logits": logits, "state": state, "output": sampled}
 
     def loadContext(self, ctx: str = "\n\n", newctx: str = "", statex=None, progressCallBack=lambda x: x):
