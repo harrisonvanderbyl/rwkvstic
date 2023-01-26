@@ -44,12 +44,11 @@ class RWKVMaster():
 
             tolens += [self.lastToken]
             sampled = self.tokenizer.decode(tolens)
-            for stops in stopTokens:
-                if tolens[-1] == stops:
-                    break
-            for stops in stopStrings:
-                if (sampled.endswith(stops)):
-                    break
+
+            if tolens[-1] in stopTokens:
+                break
+            if sampled.endswith((*stopStrings,)):
+                break
 
         return {"logits": logits, "state": state, "output": sampled}
 
