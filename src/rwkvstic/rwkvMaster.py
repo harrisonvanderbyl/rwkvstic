@@ -29,7 +29,7 @@ class RWKVMaster():
         self.initTensor = initTensor
         self.sampler = sampler
 
-    def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1, stopStrings: List[str] = [], stopTokens: List[int] = [0]):
+    def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1, stopStrings: List[str] = ["<|endoftext|>"], stopTokens: List[int] = [0]):
         state = self.myState if state is None else state
         tolens = []
         for i in range(number):
