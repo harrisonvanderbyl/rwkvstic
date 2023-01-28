@@ -244,32 +244,32 @@ class RWKVCudaQuantOps(RWKVPTOps):
 class RWKVStreamBigOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, processDtype=torch.float32, storageDtype=torch.bfloat16, target=None):
+    def __init__(self, layers, embed, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None, pinMem=None):
         import inquirer
         import torch
-        super().__init__(layers, embed, dtype=storageDtype)
+        super().__init__(layers, embed, dtype=dtype)
 
         pinMem = inquirer.prompt([inquirer.Confirm(
             'type',
             message=f"Pin memory to cpu?",
-            default=True)])['type']
+            default=True)])['type'] if pinMem is None else pinMem
 
         def pinmem(x):
             return x.pin_memory() if pinMem and x.device == "cpu" else x
 
         target = target if target is not None else float(
             input("Designate the amount of memory to allocate (in GB):"))
-        self.initTensor = lambda x: pinmem(x.to(device='cpu' if len(x.shape) == 2 else "cuda", dtype=storageDtype if len(x.shape) == 2 else processDtype)) if (
-            torch.cuda.max_memory_reserved(0)/1024/1024/1024) > target else x.to(dtype=storageDtype if len(x.shape) == 2 else processDtype).cuda()
+        self.initTensor = lambda x: pinmem(x.to(device='cpu' if len(x.shape) == 2 else "cuda", dtype=dtype if len(x.shape) == 2 else runtimedtype)) if (
+            torch.cuda.max_memory_reserved(0)/1024/1024/1024) > target else x.to(dtype=dtype if len(x.shape) == 2 else runtimedtype).cuda()
 
         # for everything in self, if its a tensor, send to cuda
 
         self.initCpuTensor = self.initTensor
         self.klimit = self.klimit.cuda(non_blocking=True)
         self.matvec = lambda z, y: z.cuda(non_blocking=True).mv(
-            y.to(storageDtype)).to(processDtype)
+            y.to(dtype)).to(runtimedtype)
         self.emptyState = torch.zeros(
-            4*layers, embed, dtype=processDtype, device="cuda")+0.01
+            4*layers, embed, dtype=runtimedtype, device="cuda")+0.01
 
         def ln(x, w, b):
             xee2 = x - self.mean(x)
@@ -284,22 +284,22 @@ class RWKVStreamBigOps(RWKVPTOps):
 class RWKVSplitCudaOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, processDtype=torch.float32, storageDtype=torch.bfloat16, target=None):
-        super().__init__(layers, embed, dtype=storageDtype)
+    def __init__(self, layers, embed, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None):
+        super().__init__(layers, embed, dtype=dtype)
         import inquirer
         import torch
 
         devices = inquirer.checkbox(
             'Which devices would you like to use?', choices=['cpu', 'cuda:0', 'cuda:1'])
 
-        self.initTensor = lambda x: x.to(dtype=processDtype).cuda() if len(
+        self.initTensor = lambda x: x.to(dtype=runtimedtype).cuda() if len(
             x.shape) == 1 else list(map(lambda zx: zx[1].to(device=devices[zx[0]], dtype=torch.float32 if "cpu" in devices[zx[0]] else torch.bfloat16), enumerate(list(x.chunk(len(devices), dim=1)))))
         self.initCpuTensor = self.initTensor
 
         # for everything in self, if its a tensor, send to cuda
-        # self.matvec = lambda x, y: x.mv(y.to(torch.float16)).to(processDtype)
+        # self.matvec = lambda x, y: x.mv(y.to(torch.float16)).to(runtimedtype)
         self.emptyState = torch.zeros(
-            4*layers, embed, dtype=processDtype, device="cuda")+0.01
+            4*layers, embed, dtype=runtimedtype, device="cuda")+0.01
 
         self.minimum = lambda x, y: torch.min(x, torch.ones_like(x)*30)
 
@@ -307,10 +307,10 @@ class RWKVSplitCudaOps(RWKVPTOps):
             chunks = list(map(lambda xx: xx[1].to(
                 device=devices[xx[0]], dtype=matx[xx[0]].dtype, non_blocking=True), enumerate(y.chunk(len(devices), dim=0))))
             res = matx[0].mv(chunks[0]).to(
-                dtype=processDtype, device=y.device, non_blocking=True)
+                dtype=runtimedtype, device=y.device, non_blocking=True)
             for i in range(1, len(chunks)):
                 res = res + matx[i].mv(chunks[i]).to(
-                    dtype=processDtype, device=y.device, non_blocking=True)
+                    dtype=runtimedtype, device=y.device, non_blocking=True)
 
             return res
 

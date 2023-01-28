@@ -29,7 +29,7 @@ class RWKVMaster():
         self.initTensor = initTensor
         self.sampler = sampler
 
-    def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1, stopStrings: List[str] = ["<|endoftext|>"], stopTokens: List[int] = [0]):
+    def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1, stopStrings: List[str] = ["<|endoftext|>"], stopTokens: List[int] = [0], progressLambda=lambda args: args):
         state = self.myState if state is None else state
         tolens = []
         for i in range(number):
@@ -44,7 +44,8 @@ class RWKVMaster():
 
             tolens += [self.lastToken]
             sampled = self.tokenizer.decode(tolens)
-
+            progressLambda(
+                {"logits": logits, "state": state, "output": sampled, "progress": i, "tokens": tolens, "total": number, "current": tokenizer.tokenizer.decode([tolens[-1]])})
             if tolens[-1] in stopTokens:
                 break
             if sampled.endswith((*stopStrings,)):
