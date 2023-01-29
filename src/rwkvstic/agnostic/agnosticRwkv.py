@@ -99,7 +99,7 @@ def AgnostigRWKV(ops: module, *args):
                 state = ops.emptyState
 
             x = ops.layernorm(
-                self.emb[x[-1]], self.emb1, self.emb2)
+                ops.processEmbed(self.emb[x[-1]]), self.emb1, self.emb2)
 
             statea = state[0::4]
             stateb = state[1::4]

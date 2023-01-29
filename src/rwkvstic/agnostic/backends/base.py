@@ -16,6 +16,7 @@ class module:
         print("init RWKVOPS, from super")
         self.initTensor = raiseNotImplemented
         self.n_layers = layers
+        self.processEmbed = lambda x: x
         self.initCpuTensor = lambda x: self.initTensor(x)
         self.sqrt = raiseNotImplemented
         self.mean = raiseNotImplemented

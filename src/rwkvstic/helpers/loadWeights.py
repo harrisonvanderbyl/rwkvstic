@@ -45,7 +45,7 @@ def loadWeights(mode, Path, *args, **kwargs):
     # Transform Weights from backend
     for x in tqdm(list(w.keys())):
         if "emb.weight" in x:
-            w[x] = ops.stack(list(map(lambda rrx: ops.initTensor(
+            w[x] = ops.stack(list(map(lambda rrx: ops.initCpuTensor(
                 rrx.squeeze()), w[x].split(1, 0))))
         else:
             w[x] = ops.initTensor(w[x])

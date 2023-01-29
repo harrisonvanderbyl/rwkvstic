@@ -103,8 +103,8 @@ class RWKVCudaOps(RWKVPTOps):
 
         self.initTensor = lambda x: x.to(dtype=self.dtype if len(
             x.shape) == 2 else runtimedtype, device='cuda')
-        self.initCpuTensor = self.initTensor  # could be used for offload
-
+        self.initCpuTensor = lambda x: x.to(dtype=runtimedtype)
+        self.processEmbed = lambda x: x.cuda(non_blocking=True)
         self.klimit = self.klimit.to(dtype=runtimedtype, device='cuda')
 
         self.matvec = lambda x, y: x.mv(
@@ -215,7 +215,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
             return xxo, xx1, xx2
 
         self.initTensor = initTensor
-        self.initCpuTensor = self.initTensor
+        self.initCpuTensor = lambda x: x.to(dtype=runtimedtype)
+        self.processEmbed = lambda x: x.to(device=dev)
 
         self.postProcessModule = lambda x: x
 
