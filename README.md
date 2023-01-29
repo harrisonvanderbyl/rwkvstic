@@ -359,3 +359,27 @@ def initMatrix(x):
     xx2 = torch.stack([x[2] for x in xx])
     return xxo, xx1, xx2
 ```
+
+## PreQuantization
+
+You can prequantize the matrixes to save loading time, and bandwidth when downloading model.
+
+```bash
+cd /path/to/folder/with/model
+python3 -m rwkvstic --pq
+
+# what model to prequantize?
+# -> model.pth
+
+ls
+# model.pth
+# model.pqth
+```
+
+You can load these pre-quantized models as you would a normal file.
+
+```python
+from rwkvstic.load import RWKV
+
+model = RWKV("model.pqth")
+```

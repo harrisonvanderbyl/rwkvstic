@@ -7,7 +7,7 @@ from typing import Dict
 from tqdm import tqdm
 
 
-def loadWeights(mode, Path, *args, **kwargs):
+def loadWeights(mode, Path, *args, processEmb=True, **kwargs):
     import torch
     n_layer = 0
 
@@ -45,8 +45,9 @@ def loadWeights(mode, Path, *args, **kwargs):
     # Transform Weights from backend
     for x in tqdm(list(w.keys())):
         if "emb.weight" in x:
-            w[x] = ops.stack(list(map(lambda rrx: ops.initCpuTensor(
-                rrx.squeeze()), w[x].split(1, 0))))
+            if (processEmb):
+                w[x] = ops.stack(list(map(lambda rrx: ops.initCpuTensor(
+                    rrx.squeeze()), w[x].split(1, 0))))
         else:
             w[x] = ops.initTensor(w[x])
 

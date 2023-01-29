@@ -19,14 +19,13 @@ def loadPreQuantized(Path):
             n_layers = int(ww[0])
 
     ops = RWKVCudaQuantOps(
-        preQuantized=True, embed=len(weights["blocks.0.ln2.weight"]), layers=n_layers, chunksize=32)
+        preQuantized=True, embed=len(weights["blocks.0.ln2.weight"]), layers=(n_layers+1), chunksize=32, useGPU=torch.cuda.is_available(), runtimedtype=torch.bfloat16)
     for w in weights.keys():
-        if "emb" in w:
-            weights[w] = ops.stack([ops.initTensor(x) for x in weights[w]])
-            continue
-
-        weights[w] = ops.initTensor(weights[w])
-
+        if "emb.weight" in w:
+            weights[w] = ops.stack([ops.initCpuTensor(x.squeeze())
+                                   for x in weights[w].split(1, 0)])
+        else:
+            weights[w] = ops.initTensor(weights[w])
     model = AgnostigRWKV(ops, weights)
     emptyState = ops.emptyState
     initTensor = ops.initTensor

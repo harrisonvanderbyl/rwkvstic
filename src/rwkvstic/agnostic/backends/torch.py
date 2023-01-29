@@ -200,7 +200,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
         def initTensor(x):
 
-            if preQuantized and isinstance(x, tuple):
+            if preQuantized and len(x) == 3:
                 return x[0].to(device=dev), x[1].to(dtype=runtimedtype, device=dev), x[2].to(dtype=runtimedtype, device=dev)
 
             if (len(x.shape) != 2):
