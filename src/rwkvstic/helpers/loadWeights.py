@@ -7,12 +7,12 @@ from typing import Dict
 from tqdm import tqdm
 
 
-def loadWeights(mode, Path, *args, processEmb=True, **kwargs):
+def loadWeights(mode, path, *args, processEmb=True, **kwargs):
     import torch
     n_layer = 0
 
     w: Dict[str, torch.Tensor] = torch.load(
-        Path, map_location="cpu")
+        path, map_location="cpu")
     # refine weights
     keys = list(w.keys())
     for x in keys:

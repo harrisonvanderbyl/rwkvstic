@@ -11,9 +11,9 @@ import os
 torch.set_num_threads(8)
 
 
-def preQuantized(Path=None) -> RWKVMaster:
+def preQuantized(path=None) -> RWKVMaster:
 
-    if (Path == None):
+    if (path == None):
         files = os.listdir()
         # filter by ending in .pth
         files = [f for f in files if f.endswith(
@@ -24,13 +24,13 @@ def preQuantized(Path=None) -> RWKVMaster:
                           message="What model do you want to quantize?",
                           choices=files,
                           )]
-        Path = inquirer.prompt(questions)["file"]
+        path = inquirer.prompt(questions)["file"]
 
     mode = "pytorch-quant(gpu-8bit)"
     ops, weights = loadWeights(
-        mode, Path, runtimedtype=torch.bfloat16, chunksize=32, useGPU=False, processEmb=False)
+        mode, path, runtimedtype=torch.bfloat16, chunksize=32, useGPU=False, processEmb=False)
 
     gc.collect()
     torch.cuda.empty_cache()
 
-    torch.save(weights, Path.replace(".pth", ".pqth"))
+    torch.save(weights, path.replace(".pth", ".pqth"))

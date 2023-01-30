@@ -5,9 +5,9 @@ from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends.jax import RWKVJaxOps
 
 
-def loadPreJax(Path):
+def loadPreJax(path):
     import jax
-    weights = jax.numpy.load(Path, allow_pickle=True)
+    weights = jax.numpy.load(path, allow_pickle=True)
     # filter out the keys that are not .block
     weightsKeys = [x for x in weights.keys() if "blocks" in x]
     n_layers = 0
