@@ -2,13 +2,13 @@ from rwkvstic.rwkvMaster import RWKVMaster
 from rwkvstic.agnostic.samplers.numpy import npsample
 
 
-def initTFLiteFile(Path):
+def initTFLiteFile(path):
     import tensorflow.lite as tflite
 
     import tensorflow as tf
 
     interpreter = tflite.Interpreter(
-        model_path=Path)
+        model_path=path)
     interpreter.allocate_tensors()
 
     input_details = interpreter.get_input_details()

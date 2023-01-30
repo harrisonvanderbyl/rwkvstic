@@ -11,9 +11,9 @@ import os
 # set torch threads to 8
 
 
-def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaster:
+def RWKV(path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaster:
 
-    if (Path == None):
+    if (path == None):
         files = os.listdir()
         # filter by ending in .pth
         files = [f for f in files if f.endswith(
@@ -24,22 +24,22 @@ def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
                           message="What model do you want to use?",
                           choices=files,
                           )]
-        Path = inquirer.prompt(questions)["file"]
+        path = inquirer.prompt(questions)["file"]
     else:
-        if ("http" in Path):
-            fileName = Path.split("/")[-1]
+        if ("http" in path):
+            fileName = path.split("/")[-1]
             if os.system("ls " + fileName):
-                os.system(f"wget {Path}")
-            Path = fileName
+                os.system(f"wget {path}")
+            path = fileName
 
-    if Path.endswith(".pt"):
-        return torchscript.initTorchScriptFile(Path)
-    elif Path.endswith(".tflite"):
-        return tflite.initTFLiteFile(Path)
-    elif Path.endswith(".pqth"):
-        return prequantized.loadPreQuantized(Path)
-    elif Path.endswith(".jax.npy"):
-        return preJax.loadPreJax(Path)
+    if path.endswith(".pt"):
+        return torchscript.initTorchScriptFile(path)
+    elif path.endswith(".tflite"):
+        return tflite.initTFLiteFile(path)
+    elif path.endswith(".pqth"):
+        return prequantized.loadPreQuantized(path)
+    elif path.endswith(".jax.npy"):
+        return preJax.loadPreJax(path)
 
     if mode is None:
         mode: str = inquirer.prompt([inquirer.List('mode',
@@ -47,7 +47,7 @@ def RWKV(Path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
                                                    choices=Backends.keys(),
                                                    )])["mode"]
 
-    ops, weights = loadWeights(mode, Path, *args, **kwargs)
+    ops, weights = loadWeights(mode, path, *args, **kwargs)
 
     gc.collect()
 

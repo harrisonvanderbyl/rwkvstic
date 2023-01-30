@@ -11,9 +11,9 @@ import os
 torch.set_num_threads(8)
 
 
-def preJax(Path=None) -> RWKVMaster:
+def preJax(path=None) -> RWKVMaster:
 
-    if (Path == None):
+    if (path == None):
         files = os.listdir()
         # filter by ending in .pth
         files = [f for f in files if f.endswith(
@@ -24,15 +24,15 @@ def preJax(Path=None) -> RWKVMaster:
                           message="What model do you want to convert to jax?",
                           choices=files,
                           )]
-        Path = inquirer.prompt(questions)["file"]
+        path = inquirer.prompt(questions)["file"]
 
     mode = "jax(cpu/gpu/tpu)"
     ops, weights = loadWeights(
-        mode, Path)
+        mode, path)
 
     gc.collect()
     torch.cuda.empty_cache()
     import jax
 
     # save
-    jax.numpy.save(Path.replace(".pth", ".jax.npy"), weights)
+    jax.numpy.save(path.replace(".pth", ".jax.npy"), weights)

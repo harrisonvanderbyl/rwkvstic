@@ -5,9 +5,9 @@ from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends.torch import RWKVCudaQuantOps
 
 
-def loadPreQuantized(Path):
+def loadPreQuantized(path):
     import torch
-    weights = torch.load(Path)
+    weights = torch.load(path)
 
     # filter out the keys that are not .block
     weightsKeys = [x for x in weights.keys() if "blocks" in x]
