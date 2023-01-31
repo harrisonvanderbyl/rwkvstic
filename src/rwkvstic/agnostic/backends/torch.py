@@ -170,7 +170,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
             bnb.matmul(torch.rand(3, 3).to(torch.int8).cuda(),
                        torch.rand(3, 3).cuda())
             vt = torch.int8
-            matmul = bnb.matmul
+            def matmul(x, y): return bnb.matmul(x[0], y[0].t())
+            chunksize = 1
         except:
             print("bitsandbytes not installed/ not compatible, using torch.matmul")
             vt = runtimedtype
@@ -198,9 +199,9 @@ class RWKVCudaQuantOps(RWKVPTOps):
             yy = y*spread
 
             rrx = rx.to(dtype=vt, device=y.device, non_blocking=True)
-            yy = (yy.reshape(yy.shape[0], 1, -1))
-            xmain = torch.stack([matmul(
-                rrx[m], yy[m]) for m in range(rrx.shape[0])]).sum(0).squeeze()
+            yy = (yy.reshape(yy.shape[0], -1, 1))
+            xmain = matmul(
+                rrx, yy).sum(0).squeeze()
 
             return xmain + torch.tensordot(zpoint, y)
         dev = 'cuda' if (inquirer.confirm(
