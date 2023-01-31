@@ -167,7 +167,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
         vt = runtimedtype
         try:
             import bitsandbytes as bnb
-            bnb.matmul(torch.rand(3, 3).to(torch.int8), torch.rand(3, 3))
+            bnb.matmul(torch.rand(3, 3).to(torch.int8).cuda(),
+                       torch.rand(3, 3).cuda())
             vt = torch.int8
             matmul = bnb.matmul
         except:
