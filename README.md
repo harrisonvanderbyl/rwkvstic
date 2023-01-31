@@ -9,6 +9,19 @@ When using BlinkDLs pretrained models, it would advised to have the `torch` pack
 Some options, when left blank, will elicit a prompt asking you to choose a value.
 for this purpose, please ensure you have the `inquirer` package installed.
 
+## Tables and graphs
+
+### Rwkv-4 models -> recomended vram
+
+```
+rwkvstic vram
+Model | 8bit | bf16/fp16 | fp32
+14B   | 16GB | 28GB      | >50GB
+7B    | 8GB  | 14GB      | 28GB
+3B    | 2.8GB| 6GB       | 12GB
+1b5   | 1.3GB| 3GB       | 6GB
+```
+
 ## Installation
 
 ```bash
