@@ -170,7 +170,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             bnb.matmul(torch.rand(3, 3).to(torch.int8).cuda(),
                        torch.rand(3, 3).cuda())
 
-            def matmul(x, y): return bnb.matmul(x[0], y[0].t())
+            def matmul(x, y): return bnb.matmul(x[0], y[0].t()).squeeze()
             chunksize = 1
         except:
             print("bitsandbytes not installed/ not compatible, using torch.matmul")
