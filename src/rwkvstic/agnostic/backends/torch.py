@@ -198,9 +198,9 @@ class RWKVCudaQuantOps(RWKVPTOps):
             yy = y*spread
 
             rrx = rx.to(dtype=vt, device=y.device, non_blocking=True)
-
-            xmain = matmul(
-                rrx, (yy.reshape(yy.shape[0], -1, 1))).sum(0).squeeze()
+            yy = (yy.reshape(yy.shape[0], -1, 1))
+            xmain = torch.stack([matmul(
+                rrx[m], yy[m]) for m in range(rrx.shape[0])]).sum(0).squeeze()
 
             return xmain + torch.tensordot(zpoint, y)
         dev = 'cuda' if (inquirer.confirm(
