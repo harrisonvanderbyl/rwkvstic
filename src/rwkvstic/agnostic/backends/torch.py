@@ -163,19 +163,31 @@ class RWKVCudaQuantOps(RWKVPTOps):
     def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None, preQuantized=False, target=None):
         import torch
         import inquirer
+        matmul = torch.matmul
+        vt = runtimedtype
+        try:
+            import bitsandbytes as bnb
+            bnb.matmul(torch.rand(3, 3).to(torch.int8), torch.rand(3, 3))
+            vt = torch.int8
+            matmul = bnb.matmul
+        except:
+            print("bitsandbytes not installed/ not compatible, using torch.matmul")
+            vt = runtimedtype
+            matmul = torch.matmul
         super().__init__(layers, embed, torch.bfloat16)
 
         def QuantizeMatrix(x, runtimeDtype, device, stream):
             rang = 255
             ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
+            mini = mini+128*ran
             x = x.double()
             x = ((x-mini)/ran)
             if stream:
                 x = x.to(
-                    dtype=torch.uint8, non_blocking=True).pin_memory()
+                    dtype=torch.int8, non_blocking=True).pin_memory()
             else:
                 x = x.to(
-                    dtype=torch.uint8, non_blocking=True, device=device)
+                    dtype=torch.int8, non_blocking=True, device=device)
 
             return x, ran.to(runtimeDtype).to(device=device), mini.to(runtimeDtype).to(device=device)
 
@@ -184,9 +196,10 @@ class RWKVCudaQuantOps(RWKVPTOps):
             y = y.reshape(rx.shape[0], -1)
             yy = y*spread
 
-            rrx = rx.to(dtype=runtimedtype, device=y.device, non_blocking=True)
+            rrx = rx.to(dtype=vt, device=y.device, non_blocking=True)
 
-            xmain = rrx.matmul(yy.reshape(yy.shape[0], -1, 1)).sum(0).squeeze()
+            xmain = matmul(
+                rrx, (yy.reshape(yy.shape[0], -1, 1))).sum(0).squeeze()
 
             return xmain + torch.tensordot(zpoint, y)
         dev = 'cuda' if (inquirer.confirm(
