@@ -160,19 +160,22 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 
 
 class RWKVCudaQuantOps(RWKVPTOps):
-    def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None, preQuantized=False):
+    def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None, preQuantized=False, target=None):
         import torch
         import inquirer
         super().__init__(layers, embed, torch.bfloat16)
 
-        def QuantizeMatrix(x, runtimeDtype, device):
+        def QuantizeMatrix(x, runtimeDtype, device, stream):
             rang = 255
             ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
             x = x.double()
             x = ((x-mini)/ran)
-
-            x = x.to(
-                dtype=torch.uint8, non_blocking=True, device=device)
+            if stream:
+                x = x.to(
+                    dtype=torch.uint8, non_blocking=True).pin_memory()
+            else:
+                x = x.to(
+                    dtype=torch.uint8, non_blocking=True, device=device)
 
             return x, ran.to(runtimeDtype).to(device=device), mini.to(runtimeDtype).to(device=device)
 
@@ -181,13 +184,17 @@ class RWKVCudaQuantOps(RWKVPTOps):
             y = y.reshape(rx.shape[0], -1)
             yy = y*spread
 
-            rx = rx.to(dtype=runtimedtype)
+            rrx = rx.cuda(non_blocking=True).to(dtype=runtimedtype)
 
-            xmain = rx.matmul(yy.reshape(yy.shape[0], -1, 1)).sum(0).squeeze()
+            xmain = rrx.matmul(yy.reshape(yy.shape[0], -1, 1)).sum(0).squeeze()
 
             return xmain + torch.tensordot(zpoint, y)
         dev = 'cuda' if (inquirer.confirm(
             "Use GPU?", default=True) if useGPU is None else useGPU) else 'cpu'
+
+        # target is gb before cpu offload
+        target = float(inquirer.text("Target size (in GB):",
+                                     default="100")) if target is None and dev == "cuda" else target
 
         runtimedtype = inquirer.prompt([inquirer.List(
             'type',
@@ -208,7 +215,9 @@ class RWKVCudaQuantOps(RWKVPTOps):
                 return x.to(dtype=runtimedtype, device=dev)
 
             splitmatrices = torch.chunk(x, chunksize, 1)
-            xx = [QuantizeMatrix(x, runtimedtype, dev)
+            dostream = torch.cuda.max_memory_reserved(
+                0)/1024/1024/1024 > target
+            xx = [QuantizeMatrix(x, runtimedtype, dev, dostream)
                   for x in splitmatrices]
             xxo = torch.stack([x[0] for x in xx])
             xx1 = torch.stack([x[1] for x in xx])
