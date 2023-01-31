@@ -198,7 +198,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             yy = y*spread
 
             rrx = rx.to(dtype=vt, device=y.device, non_blocking=True)
-            yy = (yy.reshape(yy.shape[0], -1, 1))
+            yy = (yy.reshape(yy.shape[0], 1, -1))
             xmain = torch.stack([matmul(
                 rrx[m], yy[m]) for m in range(rrx.shape[0])]).sum(0).squeeze()
 
