@@ -11,7 +11,7 @@ import os
 torch.set_num_threads(8)
 
 
-def preQuantized(path=None) -> RWKVMaster:
+def preQuantized(path=None, chunksize=32) -> RWKVMaster:
 
     if (path == None):
         files = os.listdir()
@@ -28,7 +28,7 @@ def preQuantized(path=None) -> RWKVMaster:
 
     mode = "pytorch-quant(gpu-8bit)"
     ops, weights = loadWeights(
-        mode, path, runtimedtype=torch.bfloat16, chunksize=32, useGPU=False, processEmb=False)
+        mode, path, runtimedtype=torch.bfloat16, chunksize=chunksize, useGPU=False, processEmb=False)
 
     gc.collect()
     torch.cuda.empty_cache()

@@ -178,6 +178,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
         def QuantizedMatVec(x, y, runtimedtype):
             rx, spread, zpoint = x
+            y = y.reshape(rx.shape[0], -1)
             yy = y*spread
 
             rx = rx.to(dtype=runtimedtype)
@@ -221,8 +222,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
         self.postProcessModule = lambda x: x
 
         def matvec(x, y):
-            splitVectors = y.reshape(chunksize, -1)
-            return QuantizedMatVec(x, splitVectors, runtimedtype)
+            return QuantizedMatVec(x, y, runtimedtype)
 
         self.matvec = matvec
 
