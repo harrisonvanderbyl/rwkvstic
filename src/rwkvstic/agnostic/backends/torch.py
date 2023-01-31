@@ -175,7 +175,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
         except:
             print("bitsandbytes not installed/ not compatible, using torch.matmul")
             vt = runtimedtype
-            matmul = torch.matmul
+            def matmul(x, y): return torch.matmul(x, y).sum(0).squeeze()
         super().__init__(layers, embed, torch.bfloat16)
 
         def QuantizeMatrix(x, runtimeDtype, device, stream):
@@ -201,7 +201,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             rrx = rx.to(dtype=vt, device=y.device, non_blocking=True)
             yy = (yy.reshape(yy.shape[0], -1, 1))
             xmain = matmul(
-                rrx, yy).sum(0).squeeze()
+                rrx, yy)
 
             return xmain + torch.tensordot(zpoint, y)
         dev = 'cuda' if (inquirer.confirm(
