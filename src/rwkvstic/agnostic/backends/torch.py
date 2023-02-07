@@ -225,7 +225,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
             return xxo, xx1, xx2
 
         self.initTensor = initTensor
-        self.stack = torch.stack
+        self.stack = lambda x: torch.stack(
+            x) if isinstance(x[0], torch.Tensor) else x
         self.initCpuTensor = lambda x: x.to(dtype=runtimedtype)
         self.processEmbed = lambda x: x.to(device=dev)
 
