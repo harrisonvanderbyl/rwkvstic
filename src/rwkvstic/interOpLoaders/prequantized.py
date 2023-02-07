@@ -8,7 +8,8 @@ from rwkvstic.agnostic.backends.torch import RWKVCudaQuantOps
 def loadPreQuantized(path):
     import torch
 
-    weights = torch.load(path, ...{"map_location": "cpu"} if not torch.cuda.is_available() else {})
+    weights = torch.load(
+        path, **({"map_location": "cpu"} if not torch.cuda.is_available() else {}))
 
     # filter out the keys that are not .block
     weightsKeys = [x for x in weights.keys() if "blocks" in x]
