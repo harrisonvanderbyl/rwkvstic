@@ -177,7 +177,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
                 x = x.to(
                     dtype=torch.uint8, non_blocking=True, device=device)
 
-            return x, ran.to(runtimeDtype).to(device=device), mini.to(runtimeDtype).to(device=device)
+            return [x, ran.to(runtimeDtype).to(device=device), mini.to(runtimeDtype).to(device=device)]
 
         def QuantizedMatVec(x, y, runtimedtype):
             rx, spread, zpoint = x
@@ -225,6 +225,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             return xxo, xx1, xx2
 
         self.initTensor = initTensor
+        self.stack = torch.stack
         self.initCpuTensor = lambda x: x.to(dtype=runtimedtype)
         self.processEmbed = lambda x: x.to(device=dev)
 
