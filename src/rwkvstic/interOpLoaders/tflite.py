@@ -2,7 +2,7 @@ from rwkvstic.rwkvMaster import RWKVMaster
 from rwkvstic.agnostic.samplers.numpy import npsample
 
 
-def initTFLiteFile(path, tokenizer=None, end_adj=0.0):
+def initTFLiteFile(path, tokenizer=None):
     import tensorflow.lite as tflite
 
     import tensorflow as tf
@@ -35,4 +35,4 @@ def initTFLiteFile(path, tokenizer=None, end_adj=0.0):
         [[0.01]*int(embed)]*int(layers), dtype=dtype)
 
     def initTensor(x): return tf.convert_to_tensor(x, dtype=dtype)
-    return RWKVMaster(model, emptyState, initTensor, npsample, tokenizer, end_adj=end_adj)
+    return RWKVMaster(model, emptyState, initTensor, npsample, tokenizer)
