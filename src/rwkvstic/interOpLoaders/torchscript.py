@@ -2,7 +2,7 @@ from rwkvstic.rwkvMaster import RWKVMaster
 from rwkvstic.agnostic.samplers.numpy import npsample
 
 
-def initTorchScriptFile(path):
+def initTorchScriptFile(path, tokenizer=None, end_adj=0.0):
     import torch
     embed = path.split("-")[2].split(".")[0]
     layers = path.split("-")[1]
@@ -25,4 +25,4 @@ def initTorchScriptFile(path):
 
     useSampler = "sampler" not in path
 
-    return RWKVMaster(model, emptyState, initTensor, npsample if useSampler else None)
+    return RWKVMaster(model, emptyState, initTensor, npsample if useSampler else None, tokenizer, end_adj=end_adj)

@@ -5,7 +5,7 @@ from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends.torch import RWKVCudaQuantOps
 
 
-def loadPreQuantized(path):
+def loadPreQuantized(path, tokenizer=None, end_adj=0.0):
     import torch
 
     weights = torch.load(
@@ -27,4 +27,4 @@ def loadPreQuantized(path):
     emptyState = ops.emptyState
     initTensor = ops.initTensor
 
-    return RWKVMaster(model, emptyState, initTensor, ops.sample)
+    return RWKVMaster(model, emptyState, initTensor, ops.sample, tokenizer, end_adj=end_adj)

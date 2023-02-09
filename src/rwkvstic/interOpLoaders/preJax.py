@@ -5,7 +5,7 @@ from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends.jax import RWKVJaxOps
 
 
-def loadPreJax(path):
+def loadPreJax(path, tokenizer=None, end_adj=0.0):
     import jax
     weights = jax.numpy.load(path, allow_pickle=True)
     # filter out the keys that are not .block
@@ -30,4 +30,4 @@ def loadPreJax(path):
     emptyState = ops.emptyState
     initTensor = ops.initTensor
 
-    return RWKVMaster(model, emptyState, initTensor, ops.sample)
+    return RWKVMaster(model, emptyState, initTensor, ops.sample, tokenizer, end_adj=end_adj)

@@ -11,7 +11,7 @@ import os
 # set torch threads to 8
 
 
-def RWKV(path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaster:
+def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, end_adj=0.0, **kwargs) -> RWKVMaster:
 
     if (path == None):
         files = os.listdir()
@@ -32,14 +32,18 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
                 os.system(f"wget {path}")
             path = fileName
 
+    # if (kwargs.get("legacy", None) is not None):
+    #     from rwkvstic.interOpLoaders.legacy import RWKV_RNN
+    #     return RWKV_RNN(path)
+
     if path.endswith(".pt"):
-        return torchscript.initTorchScriptFile(path)
+        return torchscript.initTorchScriptFile(path, tokenizer, end_adj=end_adj)
     elif path.endswith(".tflite"):
-        return tflite.initTFLiteFile(path)
+        return tflite.initTFLiteFile(path, tokenizer, end_adj=end_adj)
     elif path.endswith(".pqth"):
-        return prequantized.loadPreQuantized(path)
+        return prequantized.loadPreQuantized(path, tokenizer, end_adj=end_adj)
     elif path.endswith(".jax.npy"):
-        return preJax.loadPreJax(path)
+        return preJax.loadPreJax(path, tokenizer, end_adj=end_adj)
 
     if mode is None:
         mode: str = inquirer.prompt([inquirer.List('mode',
@@ -55,6 +59,7 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, **kwargs) -> RWKVMaste
     emptyState = ops.emptyState
     initTensor = ops.initTensor
 
-    ret = RWKVMaster(model, emptyState, initTensor, ops.sample)
+    ret = RWKVMaster(model, emptyState, initTensor,
+                     ops.sample, tokenizer, end_adj=end_adj)
 
     return ret
