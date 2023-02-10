@@ -48,7 +48,7 @@ class RWKVMaster():
             tolens += [self.lastToken]
             sampled = self.tokenizer.decode(tolens)
             progressLambda(
-                {"logits": logits, "state": state, "output": sampled, "progress": i, "tokens": tolens, "total": number, "current": tokenizer.tokenizer.decode([tolens[-1]])})
+                {"logits": logits, "state": state, "output": sampled, "progress": i, "tokens": tolens, "total": number, "current": self.tokenizer.decode([tolens[-1]])})
             if tolens[-1] in stopTokens:
                 break
             if sampled.endswith((*stopStrings,)):
