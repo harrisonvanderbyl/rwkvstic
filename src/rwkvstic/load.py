@@ -8,6 +8,8 @@ import gc
 from typing import Tuple
 import inquirer
 import os
+import urllib.request 
+
 # set torch threads to 8
 
 
@@ -28,8 +30,11 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
     else:
         if ("http" in path):
             fileName = path.split("/")[-1]
-            if os.system("ls " + fileName):
-                os.system(f"wget {path}")
+            # if os.system("ls " + fileName):
+                # os.system(f"wget {path}")
+
+            if not os.path.exists(fileName):
+                urllib.request.urlretrieve(path, fileName)
             path = fileName
 
     # if (kwargs.get("legacy", None) is not None):
