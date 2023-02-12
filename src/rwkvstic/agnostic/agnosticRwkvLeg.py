@@ -80,7 +80,7 @@ def LegacyRWKV(ops: module, *args):
             outb = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v))
             outc = ops.add(ops.multiply(e1, statec), e2)
             eee = p
-            wkv = ops.divide(outb, outc)
+            wkv = ops.divide(a, b)
 
             mvv = ops.add(x, ops.matvec(
                 self.outputvv[xx], ops.multiply(r, wkv)))
