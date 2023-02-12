@@ -16,16 +16,6 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
     # refine weights
     keys = list(w.keys())
     for x in keys:
-        if '.time_' in x:
-            w[x] = w[x].squeeze()
-
-        if '.time_decay' in x:
-            w[x] = torch.exp(-torch.exp(w[x].double())
-                             )
-
-        if 'receptance.weight' in x:
-            w[x] = -w[x]
-
         w[x].requires_grad = False
 
         try:
@@ -36,11 +26,22 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
 
     # store weights in self.w
 
-    keys = list(w.keys())
-
     # Load Backend
     ops: module = Backends[mode](
         n_layer, len(w[f"blocks.0.ffn.time_mix_k"]), *args, **kwargs)
+
+    keys = list(w.keys())
+    for x in keys:
+        if '.time_' in x:
+            w[x] = w[x].squeeze()
+
+        if '.time_decay' in x:
+            w[x] = -torch.exp(w[x].double())
+            if not ops.useLogFix:
+                w[x] = torch.exp(w[x])
+
+        if 'receptance.weight' in x:
+            w[x] = -w[x]
 
     # Transform Weights from backend
     for x in tqdm(list(w.keys())):

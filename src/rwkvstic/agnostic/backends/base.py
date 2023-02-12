@@ -2,9 +2,11 @@ from typing import List, Dict, Union
 
 
 class module:
-    def __init__(self, layers, embed):
+    def __init__(self, layers, embed, *args, useLogFix=True, **kwargs):
+
         from rwkvstic.agnostic.samplers.numpy import npsample
         self.VectorType = List[float]
+        self.useLogFix = useLogFix
         self.MatrixType = List[List[float]]
         self.TensorType = Union[self.VectorType, self.MatrixType]
         self.MatVec = (
@@ -22,6 +24,7 @@ class module:
         self.mean = raiseNotImplemented
         self.relu = raiseNotImplemented
         self.exp = raiseNotImplemented
+        self.maximum = raiseNotImplemented
         self.add = lambda x, y: x+y
         self.divide = lambda x, y: x/y
         self.multiply = lambda x, y: x*y

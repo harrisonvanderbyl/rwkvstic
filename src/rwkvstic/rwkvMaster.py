@@ -36,7 +36,10 @@ class RWKVMaster():
         tolens = []
         for i in range(number):
             logits, state = self.model.forward([self.lastToken], state)
-            logits[0] += end_adj
+            try:
+                logits[0] += (end_adj)
+            except:
+                pass
             self.myState = state
             sampled = self.sample(
                 logits, temp, top_p_usual) if self.sampler is not None else logits

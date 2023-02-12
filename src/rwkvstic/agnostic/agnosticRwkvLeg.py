@@ -2,7 +2,7 @@ from rwkvstic.agnostic.backends.base import module
 from typing import Dict
 
 
-def AgnostigRWKV(ops: module, *args):
+def LegacyRWKV(ops: module, *args):
     class myRWKV(ops.module):
 
         @ ops.initfunc
@@ -54,10 +54,11 @@ def AgnostigRWKV(ops: module, *args):
                 w[f"blocks.{x}.ffn.value.weight"] for x in range(ops.n_layers)])
 
         @ops.layerdef
-        def doLayer(self, x, statea, stateb, statec, stated, xx):
+        def doLayer(self, x, statea, stateb, statec, stated, statee, xx):
+
             xy = ops.layernorm(x, self.ln1w[xx], self.ln1b[xx])
 
-            kk = ops.matvec(
+            k = ops.matvec(
                 self.key[xx], ops.lerp(statea, xy, self.kktk[xx]))
 
             v = ops.matvec(self.value[xx], ops.lerp(
@@ -66,18 +67,23 @@ def AgnostigRWKV(ops: module, *args):
             r = ops.logistical(ops.matvec(
                 self.receptance[xx], ops.lerp(statea, xy, self.rrtr[xx])))
 
-            kt = ops.exp(ops.minimum(
-                ops.add(kk, self.time_first[xx]), ops.klimit))
-            k = ops.exp(ops.minimum(kk, ops.klimit))
-
-            wrd = ops.divide(
-                ops.add(stateb, ops.multiply(kt, v)), ops.add(statec, kt))
-            outb = ops.add(ops.multiply(
-                stateb, self.time_decay[xx]), ops.multiply(k, v))
-            outc = ops.add(ops.multiply(statec, self.time_decay[xx]), k)
+            ww = ops.add(k, self.time_first[xx])
+            p = ops.maximum(statee, ww)
+            e1 = ops.exp(ops.subtract(statee, p))
+            e2 = ops.exp(ops.subtract(ww, p))
+            a = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v))
+            b = ops.add(ops.multiply(e1, statec), e2)
+            ww = ops.add(statee, self.time_decay[xx])
+            p = ops.maximum(ww, k)
+            e1 = ops.exp(ops.subtract(ww, p))
+            e2 = ops.exp(ops.subtract(k, p))
+            outb = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v))
+            outc = ops.add(ops.multiply(e1, statec), e2)
+            eee = p
+            wkv = ops.divide(outb, outc)
 
             mvv = ops.add(x, ops.matvec(
-                self.outputvv[xx], ops.multiply(r, wrd)))
+                self.outputvv[xx], ops.multiply(r, wkv)))
 
             ddd = ops.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
 
@@ -90,7 +96,7 @@ def AgnostigRWKV(ops: module, *args):
             x = ops.add(mvv, ops.multiply(
                 ops.matvec(self.value_ffn[xx], ops.multiply(km, km)), rt))
 
-            return x, xy, outb, outc, ddd
+            return x, xy, outb, outc, ddd, eee
 
         @ ops.mainfunc
         def forward(self, x: ops.VectorType, state: ops.MatrixType = None):
@@ -101,17 +107,18 @@ def AgnostigRWKV(ops: module, *args):
             x = ops.layernorm(
                 ops.processEmbed(self.emb[x[-1]]), self.emb1, self.emb2)
 
-            statea = state[0::4]
-            stateb = state[1::4]
-            statec = state[2::4]
-            stated = state[3::4]
+            statea = state[0::5]
+            stateb = state[1::5]
+            statec = state[2::5]
+            stated = state[3::5]
+            statee = state[4::5]
 
             ot = []
 
             for i in range(ops.n_layers):
-                x, aaa, bbb, ccc, ddd = self.doLayer(
-                    x, statea[i], stateb[i], statec[i], stated[i], i)
-                ot = ot + [aaa, bbb, ccc, ddd]
+                x, aaa, bbb, ccc, ddd, eee = self.doLayer(
+                    x, statea[i], stateb[i], statec[i], stated[i], statee[i], i)
+                ot = ot + [aaa, bbb, ccc, ddd, eee]
 
             x = ops.matvec(self.postprocess2, ops.layernorm(x, self.postprocess0,
                                                             self.postprocess1))

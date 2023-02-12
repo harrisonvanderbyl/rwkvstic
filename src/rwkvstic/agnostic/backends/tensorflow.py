@@ -4,7 +4,7 @@ import rwkvstic.agnostic.backends.base as RWKVOp
 
 
 class RWKVTFOps(RWKVOp.module):
-    def __init__(self, layers, embed, useGPU: bool = None):
+    def __init__(self, layers, embed, *args, useGPU: bool = None, **kwargs):
         try:
             import tensorflow as tf
         except:
@@ -19,13 +19,14 @@ class RWKVTFOps(RWKVOp.module):
         tf.config.optimizer.set_experimental_options(
             {"auto_mixed_precision": True})
 
-        super(RWKVTFOps, self).__init__(layers, embed)
+        super(RWKVTFOps, self).__init__(layers, embed, *args, **kwargs)
         self.initTensor = lambda x: tf.convert_to_tensor(
             x.float().cpu().numpy())
         self.sqrt = tf.sqrt
         self.mean = tf.reduce_mean
         self.relu = lambda x: tf.maximum(x, tf.zeros_like(x))
         self.minimum = tf.minimum
+        self.maximum = tf.maximum
         self.exp = tf.exp
         self.stack = tf.stack
         self.matvec = tf.linalg.matvec
@@ -40,10 +41,11 @@ class RWKVTFOps(RWKVOp.module):
        # tensorflow function defs
         self.initfunc = lambda x: x
         self.layerdef = tf.function(
-            input_signature=5*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int64, shape=None)])
+            input_signature=(5+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int64, shape=None)])
         self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[1], dtype=tf.int32), tf.TensorSpec(
-            shape=[4*layers, embed], dtype=tf.float32)])
-        self.emptyState = tf.zeros([4*layers, embed], dtype=tf.float32)+0.01
+            shape=[(4+self.useLogFix)*layers, embed], dtype=tf.float32)])
+        self.emptyState = tf.zeros(
+            [(4+self.useLogFix)*layers, embed], dtype=tf.float32)+0.01
 
         def ln(x, w, b):
             xee2 = x - self.mean(x)
@@ -56,8 +58,8 @@ class RWKVTFOps(RWKVOp.module):
 
 
 class RWKVTFExport(RWKVOp.module):
-    def __init__(self, layers, embed,  exports=None):
-        super(RWKVTFExport, self).__init__(layers, embed)
+    def __init__(self, layers, embed, *args,  exports=None, **kwargs):
+        super(RWKVTFExport, self).__init__(layers, embed, *args, **kwargs)
         import tensorflow as tf
         self.module = tf.keras.Model
         path = f"tfdist/rwkv-{layers}-{embed}/"

@@ -1,4 +1,5 @@
 
+from rwkvstic.agnostic.agnosticRwkvLeg import LegacyRWKV
 from rwkvstic.helpers.loadWeights import loadWeights
 from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends import Backends
@@ -54,8 +55,10 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
     ops, weights = loadWeights(mode, path, *args, **kwargs)
 
     gc.collect()
-
-    model = AgnostigRWKV(ops, weights)
+    if ops.useLogFix:
+        model = LegacyRWKV(ops, weights)
+    else:
+        model = AgnostigRWKV(ops, weights)
     emptyState = ops.emptyState
     initTensor = ops.initTensor
 

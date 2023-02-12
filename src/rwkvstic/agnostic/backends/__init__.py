@@ -3,6 +3,7 @@ from rwkvstic.agnostic.backends.jax import RWKVJaxOps, RWKVNumpyOps
 from rwkvstic.agnostic.backends.tensorflow import RWKVTFExport, RWKVTFOps
 from rwkvstic.agnostic.backends.base import module
 from typing import Dict
+
 Backends: Dict[str, module] = {
     "tensorflow(cpu/gpu)": RWKVTFOps,
     "pytorch(cpu/gpu)": RWKVCudaOps,

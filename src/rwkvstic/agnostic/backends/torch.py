@@ -4,10 +4,10 @@ import rwkvstic.agnostic.backends.base as RWKVOp
 
 class RWKVPTOps(RWKVOp.module):
 
-    def __init__(self, layers, embed, dtype=None):
+    def __init__(self, layers, embed, *args, dtype=None, **kwargs):
         import torch
         import inquirer
-        super().__init__(layers, embed)
+        super().__init__(layers, embed,  dtype=dtype, *args, **kwargs)
         q = [inquirer.List(
             'type',
             message="Load model with which dtype?",
@@ -28,6 +28,7 @@ class RWKVPTOps(RWKVOp.module):
         self.initCpuTensor = lambda x: self.initTensor(x).cpu()
         self.klimit = torch.tensor(
             [18] * embed).to(dtype=self.dtype)
+        self.maximum = torch.maximum
         self.minimum = torch.minimum
         self.sqrt = torch.sqrt
         self.mean = torch.mean
@@ -56,7 +57,7 @@ class RWKVPTOps(RWKVOp.module):
             return torch.layer_norm(x, w.shape, w, b)
         self.layernorm = layernorm
         self.emptyState = torch.zeros(
-            4*layers, embed, dtype=self.dtype)+0.0
+            (4+self.useLogFix)*layers, embed, dtype=self.dtype)+0.0
 
         self.TensorType = torch.Tensor
         self.MatrixType = torch.Tensor
@@ -64,9 +65,9 @@ class RWKVPTOps(RWKVOp.module):
 
 
 class RWKVPTCompatOps(RWKVPTOps):
-    def __init__(self, layers, embed, *args):
+    def __init__(self, layers, embed, *args, **kwargs):
         import torch
-        RWKVPTOps.__init__(self, layers, embed, *args)
+        RWKVPTOps.__init__(self, layers, embed, *args, **kwargs)
         self.relu = lambda x: torch.max(x, torch.zeros_like(x))
         self.matvec = lambda x, y: torch.sum(x*y, dim=1)
 
@@ -108,24 +109,15 @@ class RWKVCudaOps(RWKVPTOps):
         self.klimit = self.klimit.to(dtype=runtimedtype, device='cuda')
 
         self.matvec = lambda x, y: x.mv(
-            y.to(self.dtype)).to(runtimedtype)
-
-        def ln(x, w, b):
-            xee2 = x - self.mean(x)
-
-            x2 = self.sqrt(self.mean(xee2*xee2) + 0.000009999999747378752)
-
-            return w*(xee2/x2) + b
-
-        self.layernorm = ln
+            y.to(dtype=self.dtype)).to(dtype=runtimedtype)
 
         self.emptyState = torch.zeros(
-            4*layers, embed, dtype=runtimedtype, device="cuda")+0.01
+            (4+self.useLogFix)*layers, embed, dtype=runtimedtype, device="cuda")+0.01
 
 
 class RWKVPTTSExportOps(RWKVCudaOps):
-    def __init__(self, layers, embed, *args, includeSampler=None):
-        super().__init__(layers, embed, *args)
+    def __init__(self, layers, embed, *args, includeSampler=None, **kwargs):
+        super().__init__(layers, embed, *args, **kwargs)
         import torch
         import inquirer
         self.stack = lambda x: torch.stack(x)
@@ -147,8 +139,8 @@ class RWKVPTTSExportOps(RWKVCudaOps):
 
 
 class RWKVCudaDeepspeedOps(RWKVCudaOps):
-    def __init__(self, layers, embed, *args):
-        super().__init__(layers, embed, *args)
+    def __init__(self, layers, embed, *args, **kwargs):
+        super().__init__(layers, embed, *args, **kwargs)
 
         try:
             import deepspeed
@@ -160,10 +152,10 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 
 
 class RWKVCudaQuantOps(RWKVPTOps):
-    def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None, preQuantized=False, target=None):
+    def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None, preQuantized=False, target=None, **kwargs):
         import torch
         import inquirer
-        super().__init__(layers, embed, torch.bfloat16)
+        super().__init__(layers, embed, *args, dtype=torch.bfloat16, **kwargs)
 
         def QuantizeMatrix(x, runtimeDtype, device, stream):
             rang = 255
@@ -240,7 +232,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
         self.klimit = self.klimit.to(dtype=runtimedtype, device=dev)
 
         self.emptyState = torch.zeros(
-            4*layers, embed, dtype=runtimedtype, device=dev)+0.01
+            (4+self.useLogFix)*layers, embed, dtype=runtimedtype, device=dev)+0.01
 
 
 # class RWKVPoptorchOps(RWKVPTOps):
@@ -256,10 +248,10 @@ class RWKVCudaQuantOps(RWKVPTOps):
 class RWKVStreamBigOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None, pinMem=None):
+    def __init__(self, layers, embed, *args, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None, pinMem=None, **kwargs):
         import inquirer
         import torch
-        super().__init__(layers, embed, dtype=dtype)
+        super().__init__(layers, embed, *args, **kwargs)
 
         pinMem = inquirer.prompt([inquirer.Confirm(
             'type',
@@ -281,7 +273,7 @@ class RWKVStreamBigOps(RWKVPTOps):
         self.matvec = lambda z, y: z.cuda(non_blocking=True).mv(
             y.to(dtype)).to(runtimedtype)
         self.emptyState = torch.zeros(
-            4*layers, embed, dtype=runtimedtype, device="cuda")+0.01
+            (4+self.useLogFix)*layers, embed, dtype=runtimedtype, device="cuda")+0.01
 
         def ln(x, w, b):
             xee2 = x - self.mean(x)
@@ -296,8 +288,8 @@ class RWKVStreamBigOps(RWKVPTOps):
 class RWKVSplitCudaOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None):
-        super().__init__(layers, embed, dtype=dtype)
+    def __init__(self, layers, embed, *args, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None, **kwargs):
+        super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
         import inquirer
         import torch
 
@@ -311,9 +303,9 @@ class RWKVSplitCudaOps(RWKVPTOps):
         # for everything in self, if its a tensor, send to cuda
         # self.matvec = lambda x, y: x.mv(y.to(torch.float16)).to(runtimedtype)
         self.emptyState = torch.zeros(
-            4*layers, embed, dtype=runtimedtype, device="cuda")+0.01
+            (4+self.useLogFix)*layers, embed, dtype=runtimedtype, device="cuda")+0.01
 
-        self.minimum = lambda x, y: torch.min(x, torch.ones_like(x)*30)
+        self.minimum = torch.minimum
 
         def matvec(matx, y):
             chunks = list(map(lambda xx: xx[1].to(
