@@ -46,7 +46,7 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
         return torchscript.initTorchScriptFile(path, tokenizer)
     elif path.endswith(".tflite"):
         return tflite.initTFLiteFile(path, tokenizer)
-    elif path.endswith(".safeTensors"):
+    elif path.endswith(".safetensors"):
         return rwkvRs.initRwkvRsFile(path, tokenizer)
     elif path.endswith(".pqth"):
         return prequantized.loadPreQuantized(path, tokenizer)
