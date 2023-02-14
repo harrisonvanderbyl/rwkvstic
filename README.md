@@ -68,7 +68,7 @@ dtype = torch.bfloat16 # torch.float32, torch.float64, torch.bfloat16
 
 useGPU = True # False
 
-model = RWKV("path/to/model.pth", backend=TORCH, useGPU=useGPU, runtimedtype=runtimdtype, dtype=dtype)
+model = RWKV("path/to/model.pth", backend=TORCH, useGPU=useGPU, runtimedtype=runtimedtype, dtype=dtype)
 ```
 
 ### JAX
