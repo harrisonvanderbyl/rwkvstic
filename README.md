@@ -68,7 +68,7 @@ dtype = torch.bfloat16 # torch.float32, torch.float64, torch.bfloat16
 
 useGPU = True # False
 
-model = RWKV("path/to/model.pth", backend=TORCH, useGPU=useGPU, runtimedtype=runtimedtype, dtype=dtype)
+model = RWKV("path/to/model.pth", mode=TORCH, useGPU=useGPU, runtimedtype=runtimedtype, dtype=dtype)
 ```
 
 ### JAX
@@ -79,7 +79,7 @@ from rwkvstic.agnostic.backends import JAX
 
 # Jax will automatically use the GPU if available, and will use the CPU if not available
 
-model = RWKV("path/to/model.pth", backend=JAX)
+model = RWKV("path/to/model.pth", mode=JAX)
 ```
 
 ### TensorFlow
@@ -90,7 +90,7 @@ from rwkvstic.agnostic.backends import TF
 
 useGPU = True # False
 
-model = RWKV("path/to/model.pth", backend=TF, useGPU=useGPU)
+model = RWKV("path/to/model.pth", mode=TF, useGPU=useGPU)
 ```
 
 ### Numpy
@@ -100,7 +100,7 @@ from rwkvstic.load import RWKV
 from rwkvstic.agnostic.backends import NUMPY
 
 # you masochistic bastard
-model = RWKV("path/to/model.pth", backend=NUMPY)
+model = RWKV("path/to/model.pth", mode=NUMPY)
 ```
 
 ### Streaming
@@ -123,7 +123,7 @@ target = 4
 # Pin Memory is used to speed up the transfer of data to the GPU, but will use more memory, both on the GPU and on the CPU
 pin_memory = True
 
-model = RWKV("path/to/model.pth", backend=TORCH_STREAM, runtimedtype=runtime_dtype, dtype=dtype, target=target, pinMem=pin_memory)
+model = RWKV("path/to/model.pth", mode=TORCH_STREAM, runtimedtype=runtime_dtype, dtype=dtype, target=target, pinMem=pin_memory)
 
 ```
 
@@ -141,7 +141,7 @@ runtime_dtype = torch.float32 # torch.float64, torch.bfloat16
 # this is the dtype used for matrix-vector operations, and is the dtype that will determine the performance and memory usage of the model
 dtype = torch.bfloat16 # torch.float32, torch.float64, torch.bfloat16
 
-model = RWKV("path/to/model.pth", backend=TORCH_SPLIT, runtimedtype=runtime_dtype, dtype=dtype)
+model = RWKV("path/to/model.pth", mode=TORCH_SPLIT, runtimedtype=runtime_dtype, dtype=dtype)
 
 ```
 
@@ -164,7 +164,7 @@ useGPU = True # False
 # this is the amount of GB you want to use for matrix storage, if the model is too large, matrixes will be stored in ram and moved to the GPU as needed, same as stream
 target = 4
 
-model = RWKV("path/to/model.pth", backend=TORCH_QUANT, runtimedtype=runtime_dtype, chunksize=chunksize, useGPU=useGPU, target=target)
+model = RWKV("path/to/model.pth", mode=TORCH_QUANT, runtimedtype=runtime_dtype, chunksize=chunksize, useGPU=useGPU, target=target)
 ```
 
 ## Step 2: State management
