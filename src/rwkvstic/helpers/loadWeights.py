@@ -5,6 +5,7 @@ from rwkvstic.agnostic.backends.base import module
 
 from typing import Dict
 from tqdm import tqdm
+import inquirer
 
 
 def loadWeights(mode, path, *args, processEmb=True, **kwargs):
@@ -30,7 +31,7 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
     ops: module = Backends[mode](
         n_layer, len(w[f"blocks.0.ffn.time_mix_k"]), *args, **kwargs)
 
-    if kwargs["lora_r"] > 0:
+    if kwargs.get("lora_r", 0) > 0:
         keys = set(w.keys())
         for k in keys:
             k: str
@@ -46,6 +47,12 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
                         (kwargs["lora_alpha"] / kwargs["lora_r"])
                     del w[lora_A]
                     del w[lora_B]
+        if kwargs.get('lora_bake', None) is None:
+            kwargs['lora_bake'] = inquirer.confirm(
+                'bake lora into weights?')
+        if kwargs['lora_bake']:
+            print('baking lora into weights')
+            torch.save(w, path.replace('.pth', '.Baked.pth'))
 
     keys = list(w.keys())
     for x in keys:
