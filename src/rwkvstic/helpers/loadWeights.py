@@ -30,8 +30,26 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
     ops: module = Backends[mode](
         n_layer, len(w[f"blocks.0.ffn.time_mix_k"]), *args, **kwargs)
 
+    if kwargs["lora_r"] > 0:
+        keys = set(w.keys())
+        for k in keys:
+            k: str
+            if k.endswith('.weight'):
+                prefix = k[:-len('.weight')]
+                lora_A = prefix + '.lora_A.weight'
+                lora_B = prefix + '.lora_B.weight'
+                if lora_A in keys:
+                    assert lora_B in keys
+                    print(f'merging {lora_A} and {lora_B} into {k}')
+                    assert w[lora_B].shape[1] == w[lora_A].shape[0] == kwargs["lora_r"]
+                    w[k] += w[lora_B] @ w[lora_A] * \
+                        (kwargs["lora_alpha"] / kwargs["lora_r"])
+                    del w[lora_A]
+                    del w[lora_B]
+
     keys = list(w.keys())
     for x in keys:
+
         if '.time_' in x:
             w[x] = w[x].squeeze()
 
