@@ -175,14 +175,16 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
         def QuantizedMatVec(x, y, runtimedtype):
             if len(x) != 3:
-                return x.mv(y.to(x.device)).to(dtype=runtimedtype)
+                return x.mv(y.to(dtype)).to(dtype=runtimedtype)
             rx, spread, zpoint = x
             y = y.reshape(rx.shape[0], -1)
             yy = y*spread
 
-            rrx = rx.to(dtype=runtimedtype, device=y.device, non_blocking=True)
+            rrx = rx.to(dtype=dtype, device=y.device, non_blocking=True)
+            yy = yy.to(dtype=dtype)
 
-            xmain = rrx.matmul(yy.reshape(yy.shape[0], -1, 1)).sum(0).squeeze()
+            xmain = rrx.matmul(yy.reshape(
+                yy.shape[0], -1, 1)).sum(0).squeeze().to(dtype=runtimedtype)
 
             return xmain + torch.tensordot(zpoint, y)
         dev = 'cuda' if (inquirer.confirm(
@@ -214,6 +216,12 @@ class RWKVCudaQuantOps(RWKVPTOps):
                 return x.to(dtype=runtimedtype, device=dev)
 
             if preQuantized:
+                return x.to(dtype=dtype, device=dev)
+
+            dontQuantize = (torch.cuda.max_memory_reserved(
+                0)/1024/1024/1024 > maxQuantTarget) if dev == "cuda" else False
+
+            if dontQuantize:
                 return x.to(dtype=dtype, device=dev)
 
             splitmatrices = torch.chunk(x, chunksize, 1)
