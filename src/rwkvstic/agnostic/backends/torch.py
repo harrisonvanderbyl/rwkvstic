@@ -152,10 +152,12 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 
 
 class RWKVCudaQuantOps(RWKVPTOps):
-    def __init__(self, layers, embed, *args, runtimedtype=None, useGPU=None, chunksize=None, preQuantized=False, target=None, **kwargs):
+    import torch
+
+    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.bfloat16, useGPU=None, chunksize=None, preQuantized=False, maxQuantTarget=None, target=None, **kwargs):
         import torch
         import inquirer
-        super().__init__(layers, embed, *args, dtype=torch.bfloat16, **kwargs)
+        super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
 
         def QuantizeMatrix(x, runtimeDtype, device, stream):
             rang = 255
@@ -172,6 +174,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
             return [x, ran.to(runtimeDtype).to(device=device), mini.to(runtimeDtype).to(device=device)]
 
         def QuantizedMatVec(x, y, runtimedtype):
+            if len(x) != 3:
+                return x.mv(y.to(x.device)).to(dtype=runtimedtype)
             rx, spread, zpoint = x
             y = y.reshape(rx.shape[0], -1)
             yy = y*spread
@@ -187,6 +191,9 @@ class RWKVCudaQuantOps(RWKVPTOps):
         # target is gb before cpu offload
         target = float(inquirer.text("Target size (in GB):",
                                      default="100")) if target is None and dev == "cuda" else target
+
+        maxQuantTarget = float(inquirer.text("Max quantization target size (in GB):",
+                                             default="100")) if maxQuantTarget is None and dev == "cuda" else maxQuantTarget
 
         runtimedtype = inquirer.prompt([inquirer.List(
             'type',
@@ -206,6 +213,9 @@ class RWKVCudaQuantOps(RWKVPTOps):
             if (len(x.shape) != 2):
                 return x.to(dtype=runtimedtype, device=dev)
 
+            if preQuantized:
+                return x.to(dtype=dtype, device=dev)
+
             splitmatrices = torch.chunk(x, chunksize, 1)
             dostream = (torch.cuda.max_memory_reserved(
                 0)/1024/1024/1024 > target) if dev == "cuda" else False
@@ -215,7 +225,6 @@ class RWKVCudaQuantOps(RWKVPTOps):
             xx1 = torch.stack([x[1] for x in xx])
             xx2 = torch.stack([x[2] for x in xx])
             return xxo, xx1, xx2
-
         self.initTensor = initTensor
         self.stack = lambda x: torch.stack(
             x) if isinstance(x[0], torch.Tensor) else x
