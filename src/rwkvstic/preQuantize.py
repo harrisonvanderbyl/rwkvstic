@@ -11,7 +11,7 @@ import os
 torch.set_num_threads(8)
 
 
-def preQuantized(path=None, chunksize=32, useLogFix=False) -> RWKVMaster:
+def preQuantized(path=None, chunksize=32, useLogFix=True) -> RWKVMaster:
 
     if (path == None):
         files = os.listdir()

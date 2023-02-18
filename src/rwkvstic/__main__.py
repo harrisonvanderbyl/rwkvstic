@@ -5,7 +5,7 @@ if __name__ == '__main__':
     import rwkvstic.preJax as pj
     args = {
         "chunksize": 32 if "--cs" not in argv else int(argv[-1].split("=")[1]),
-        "useLogFix": "--logfix" in argv,
+        "useLogFix": "--nologfix" not in argv,
     }
     if ("--server" in argv):
         import rwkvstic.server as server
