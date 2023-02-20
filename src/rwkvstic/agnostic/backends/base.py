@@ -48,8 +48,8 @@ class module:
         self.layerdef = raiseNotImplemented
         self.mainfunc = raiseNotImplemented
         import numpy as np
-        self.emptyState: self.MatrixType = np.array((([[0.01]*embed, [0.01]*embed, [0.01]*embed, [
-            0.01]*embed]+([[-1e30]*embed] if self.useLogFix else [])))*layers)
+        self.emptyState: self.MatrixType = np.array((([[0.00]*embed, [0.00]*embed, [0.00]*embed, [
+            0.00]*embed]+([[-1e30]*embed] if self.useLogFix else [])))*layers)
 
         print(self.emptyState.shape)
 
