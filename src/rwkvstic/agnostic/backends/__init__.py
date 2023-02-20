@@ -2,6 +2,7 @@ from rwkvstic.agnostic.backends.torch import RWKVCudaOps, RWKVPTCompatOps, RWKVP
 from rwkvstic.agnostic.backends.jax import RWKVJaxOps, RWKVNumpyOps
 from rwkvstic.agnostic.backends.tensorflow import RWKVTFExport, RWKVTFOps
 from rwkvstic.agnostic.backends.base import module
+from rwkvstic.agnostic.backends.onnx import RWKVOnnxOps
 from typing import Dict
 
 Backends: Dict[str, module] = {
@@ -15,7 +16,8 @@ Backends: Dict[str, module] = {
     "pytorch-split(2xgpu)": RWKVSplitCudaOps,
     "export-torchscript": RWKVPTTSExportOps,
     "export-tensorflow": RWKVTFExport,
-    "pytorch-compatibility(cpu/debug)": RWKVPTCompatOps
+    "pytorch-compatibility(cpu/debug)": RWKVPTCompatOps,
+    "onnx": RWKVOnnxOps
 }
 
 

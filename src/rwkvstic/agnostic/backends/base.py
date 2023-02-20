@@ -32,6 +32,7 @@ class module:
         self.stack = raiseNotImplemented
         self.matvec = raiseNotImplemented
         self.layernorm = raiseNotImplemented
+
         self.lerp = raiseNotImplemented
 
         def ppt(x: self.VectorType):
@@ -46,7 +47,11 @@ class module:
         self.initfunc = raiseNotImplemented
         self.layerdef = raiseNotImplemented
         self.mainfunc = raiseNotImplemented
-        self.emptyState: self.MatrixType = []
+        import numpy as np
+        self.emptyState: self.MatrixType = np.array((([[0.01]*embed, [0.01]*embed, [0.01]*embed, [
+            0.01]*embed]+([[-1e30]*embed] if self.useLogFix else [])))*layers)
+
+        print(self.emptyState.shape)
 
         def logistical(x: self.VectorType) -> self.VectorType:
             return 1 / (self.exp(x) + 1)
@@ -56,4 +61,9 @@ class module:
         self.sample = npsample
 
         # typing, set as any
+
         self.tensorDef = None
+
+        self.stackEmb = False
+
+        self.getIndex = lambda x, y: x[y[-1]]

@@ -34,7 +34,6 @@ class RWKVNumpyOps(RWKVOp.module):
 
             return w*(xee2/x2) + b
         self.layernorm = ln
-        self.emptyState = [[0.01]*embed]*(4+self.useLogFix)*layers
 
 
 class RWKVJaxOps(RWKVOp.module):
@@ -73,4 +72,4 @@ class RWKVJaxOps(RWKVOp.module):
             return w*(xee2/x2) + b
 
         self.layernorm = ln
-        self.emptyState = npjax.array([[0.01]*embed]*(4+self.useLogFix)*layers)
+        self.emptyState = npjax.array(self.emptyState)

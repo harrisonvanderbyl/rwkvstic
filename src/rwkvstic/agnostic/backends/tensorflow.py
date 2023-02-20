@@ -44,8 +44,8 @@ class RWKVTFOps(RWKVOp.module):
             input_signature=(5+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int64, shape=None)])
         self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[1], dtype=tf.int32), tf.TensorSpec(
             shape=[(4+self.useLogFix)*layers, embed], dtype=tf.float32)])
-        self.emptyState = tf.zeros(
-            [(4+self.useLogFix)*layers, embed], dtype=tf.float32)+0.01
+        self.emptyState = tf.convert_to_tensor(
+            self.emptyState, dtype=tf.float32)
 
         def ln(x, w, b):
             xee2 = x - self.mean(x)

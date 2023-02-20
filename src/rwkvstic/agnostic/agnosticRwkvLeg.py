@@ -69,12 +69,15 @@ def LegacyRWKV(ops: module, *args):
 
             ww = ops.add(k, self.time_first[xx])
             p = ops.maximum(statee, ww)
+
             e1 = ops.exp(ops.subtract(statee, p))
             e2 = ops.exp(ops.subtract(ww, p))
             a = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v))
             b = ops.add(ops.multiply(e1, statec), e2)
             ww = ops.add(statee, self.time_decay[xx])
+
             p = ops.maximum(ww, k)
+
             e1 = ops.exp(ops.subtract(ww, p))
             e2 = ops.exp(ops.subtract(k, p))
             outb = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v))
@@ -105,7 +108,8 @@ def LegacyRWKV(ops: module, *args):
                 state = ops.emptyState
 
             x = ops.layernorm(
-                ops.processEmbed(self.emb[x[-1]]), self.emb1, self.emb2)
+                ops.processEmbed(ops.getIndex(self.emb, x)),
+                self.emb1, self.emb2)
 
             statea = state[0::5]
             stateb = state[1::5]

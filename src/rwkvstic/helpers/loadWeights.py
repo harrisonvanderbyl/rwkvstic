@@ -29,7 +29,7 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
 
     # Load Backend
     ops: module = Backends[mode](
-        n_layer, len(w[f"blocks.0.ffn.time_mix_k"]), *args, **kwargs)
+        n_layer, len(w[f"blocks.0.ffn.time_mix_k"].squeeze()), *args, **kwargs)
 
     if kwargs.get("lora_r", 0) > 0:
         keys = set(w.keys())
@@ -71,9 +71,16 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
     # Transform Weights from backend
     for x in tqdm(list(w.keys())):
         if "emb.weight" in x:
-            if (processEmb):
-                w[x] = ops.stack(list(map(lambda rrx: ops.initCpuTensor(
-                    rrx.squeeze()), w[x].split(1, 0))))
+
+            if (ops.stackEmb):
+
+                if (processEmb):
+                    w[x] = ops.stack(list(map(lambda rrx: ops.initCpuTensor(
+                        rrx.squeeze()), w[x].split(1, 0))))
+
+            else:
+                w[x] = ops.initCpuTensor(w[x].squeeze())
+
         else:
             w[x] = ops.initTensor(w[x])
 

@@ -56,8 +56,7 @@ class RWKVPTOps(RWKVOp.module):
 
             return torch.layer_norm(x, w.shape, w, b)
         self.layernorm = layernorm
-        self.emptyState = torch.zeros(
-            (4+self.useLogFix)*layers, embed, dtype=self.dtype)+0.0
+        self.emptyState = torch.tensor(self.emptyState, dtype=self.dtype)
 
         self.TensorType = torch.Tensor
         self.MatrixType = torch.Tensor
@@ -111,8 +110,7 @@ class RWKVCudaOps(RWKVPTOps):
         self.matvec = lambda x, y: x.mv(
             y.to(dtype=self.dtype)).to(dtype=runtimedtype)
 
-        self.emptyState = torch.zeros(
-            (4+self.useLogFix)*layers, embed, dtype=runtimedtype, device="cuda")+0.01
+        self.emptyState = self.emptyState.to(dtype=self.dtype, device='cuda')
 
 
 class RWKVPTTSExportOps(RWKVCudaOps):
@@ -248,8 +246,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
         self.klimit = self.klimit.to(dtype=runtimedtype, device=dev)
 
-        self.emptyState = torch.zeros(
-            (4+self.useLogFix)*layers, embed, dtype=runtimedtype, device=dev)+0.01
+        self.emptyState = self.emptyState.to(dtype=runtimedtype, device=dev)
 
 
 # class RWKVPoptorchOps(RWKVPTOps):
@@ -289,8 +286,7 @@ class RWKVStreamBigOps(RWKVPTOps):
         self.klimit = self.klimit.cuda(non_blocking=True)
         self.matvec = lambda z, y: z.cuda(non_blocking=True).mv(
             y.to(dtype)).to(runtimedtype)
-        self.emptyState = torch.zeros(
-            (4+self.useLogFix)*layers, embed, dtype=runtimedtype, device="cuda")+0.01
+        self.emptyState = self.emptyState.to(dtype=runtimedtype, device='cuda')
 
         def ln(x, w, b):
             xee2 = x - self.mean(x)
@@ -319,8 +315,7 @@ class RWKVSplitCudaOps(RWKVPTOps):
 
         # for everything in self, if its a tensor, send to cuda
         # self.matvec = lambda x, y: x.mv(y.to(torch.float16)).to(runtimedtype)
-        self.emptyState = torch.zeros(
-            (4+self.useLogFix)*layers, embed, dtype=runtimedtype, device="cuda")+0.01
+        self.emptyState = self.emptyState.to(dtype=runtimedtype, device='cuda')
 
         self.minimum = torch.minimum
 
