@@ -1,27 +1,13 @@
 import numpy as np
 
 import rwkvstic.agnostic.backends.base as RWKVOp
-import onnx
-
-
-def create_initializer_tensor(
-        name: str,
-        tensor_array: np.ndarray,
-        data_type: onnx.TensorProto = onnx.TensorProto.FLOAT
-) -> onnx.TensorProto:
-
-    # (TensorProto)
-    initializer_tensor = onnx.helper.make_tensor(
-        name=name,
-        data_type=data_type,
-        dims=tensor_array.shape,
-        vals=tensor_array.flatten().tolist())
-
-    return initializer_tensor
 
 
 class RWKVOnnxOps(RWKVOp.module):
+
     def __init__(self, layers, embed, *args, **kwargs):
+        import onnx
+
         super().__init__(layers, embed, *args, **kwargs)
         print("embed ", embed)
 

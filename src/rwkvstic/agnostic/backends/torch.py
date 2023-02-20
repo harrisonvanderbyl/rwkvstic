@@ -110,7 +110,7 @@ class RWKVCudaOps(RWKVPTOps):
         self.matvec = lambda x, y: x.mv(
             y.to(dtype=self.dtype)).to(dtype=runtimedtype)
 
-        self.emptyState = self.emptyState.to(dtype=self.dtype, device='cuda')
+        self.emptyState = self.emptyState.to(dtype=runtimedtype, device='cuda')
 
 
 class RWKVPTTSExportOps(RWKVCudaOps):
