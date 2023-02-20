@@ -3,6 +3,7 @@ from rwkvstic.agnostic.backends.jax import RWKVJaxOps, RWKVNumpyOps
 from rwkvstic.agnostic.backends.tensorflow import RWKVTFExport, RWKVTFOps
 from rwkvstic.agnostic.backends.base import module
 from rwkvstic.agnostic.backends.onnx import RWKVOnnxOps
+from rwkvstic.agnostic.backends.coreml import RWKVCoreMLOps
 from typing import Dict
 
 Backends: Dict[str, module] = {
@@ -17,7 +18,8 @@ Backends: Dict[str, module] = {
     "export-torchscript": RWKVPTTSExportOps,
     "export-tensorflow": RWKVTFExport,
     "pytorch-compatibility(cpu/debug)": RWKVPTCompatOps,
-    "onnx": RWKVOnnxOps
+    "onnx": RWKVOnnxOps,
+    "coreml": RWKVCoreMLOps
 }
 
 
@@ -32,3 +34,5 @@ TORCH_EXPORT = "export-torchscript"
 TF_EXPORT = "export-tensorflow"
 TORCH_COMPAT = "pytorch-compatibility(cpu/debug)"
 NUMPY = "numpy(cpu)"
+ONNX = "onnx"
+COREML = "coreml"
