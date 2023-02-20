@@ -291,6 +291,9 @@ class RWKVOnnxOps(RWKVOp.module):
 
         self.getIndex = getIndex
 
+        # convert to float32
+        self.emptyState = np.array(self.emptyState, dtype=np.float32)
+
         # self.zero = initTensor([0.0]*embed)
 
         def ppm(x):
