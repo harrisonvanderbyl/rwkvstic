@@ -32,10 +32,10 @@ class RWKVMaster():
         self.sampler = sampler
 
     def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1, stopStrings: List[str] = ["<|endoftext|>"], stopTokens: List[int] = [0], progressLambda=lambda args: args, end_adj=0.0):
-        state = self.myState if state is None else state
+        ostate = self.myState if state is None else state
         tolens = []
         for i in range(number):
-            logits, ostate = self.model.forward([self.lastToken], state)
+            logits, ostate = self.model.forward([self.lastToken], ostate)
             try:
                 logits[0] += (end_adj)
             except:
@@ -51,13 +51,13 @@ class RWKVMaster():
             tolens += [self.lastToken]
             sampled = self.tokenizer.decode(tolens)
             progressLambda(
-                {"logits": logits, "state": state, "output": sampled, "progress": i, "tokens": tolens, "total": number, "current": self.tokenizer.decode([tolens[-1]])})
+                {"logits": logits, "state": ostate, "output": sampled, "progress": i, "tokens": tolens, "total": number, "current": self.tokenizer.decode([tolens[-1]])})
             if tolens[-1] in stopTokens:
                 break
             if sampled.endswith((*stopStrings,)):
                 break
 
-        return {"logits": logits, "state": state, "output": sampled}
+        return {"logits": logits, "state": ostate, "output": sampled}
 
     def loadContext(self, ctx: str = "\n\n", newctx: str = "", statex=None, progressCallBack=lambda x: x):
         statex = self.myState if statex is None else statex
