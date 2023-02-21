@@ -265,7 +265,7 @@ class RWKVStreamBigOps(RWKVPTOps):
     def __init__(self, layers, embed, *args, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None, pinMem=None, **kwargs):
         import inquirer
         import torch
-        super().__init__(layers, embed, *args, **kwargs)
+        super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
 
         pinMem = inquirer.prompt([inquirer.Confirm(
             'type',
