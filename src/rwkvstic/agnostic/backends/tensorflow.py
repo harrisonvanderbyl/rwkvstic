@@ -37,7 +37,7 @@ class RWKVTFOps(RWKVOp.module):
         self.lerp = lambda x, y, z: x*(1-z)+y*z
        # module def
         self.module = tf.Module
-
+        # class def
        # tensorflow function defs
         self.initfunc = lambda x: x
         self.layerdef = tf.function(
@@ -57,7 +57,7 @@ class RWKVTFOps(RWKVOp.module):
         self.layernorm = ln
 
 
-class RWKVTFExport(RWKVOp.module):
+class RWKVTFExport(RWKVTFOps):
     def __init__(self, layers, embed, *args,  exports=None, **kwargs):
         super(RWKVTFExport, self).__init__(layers, embed, *args, **kwargs)
         import tensorflow as tf
