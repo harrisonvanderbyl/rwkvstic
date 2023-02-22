@@ -301,17 +301,17 @@ class RWKVStreamBigOps(RWKVPTOps):
 class RWKVSplitCudaOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, *args, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None, **kwargs):
+    def __init__(self, layers, embed, *args, runtimedtype=torch.float32, dtype=torch.bfloat16, devices=None, **kwargs):
         super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
         import inquirer
         import torch
 
         devices = inquirer.checkbox(
-            'Which devices would you like to use?', choices=['cpu', 'cuda:0', 'cuda:1'])
+            'Which devices would you like to use?', choices=['cpu', *[f"cuda:{x}" for x in range(torch.cuda.device_count())]]) if devices is None else devices
 
         self.initTensor = lambda x: x.to(dtype=runtimedtype).cuda() if len(
             x.shape) == 1 else list(map(lambda zx: zx[1].to(device=devices[zx[0]], dtype=torch.float32 if "cpu" in devices[zx[0]] else torch.bfloat16), enumerate(list(x.chunk(len(devices), dim=1)))))
-        self.initCpuTensor = self.initTensor
+        self.initCpuTensor = lambda x: x.to(dtype=runtimedtype)
 
         # for everything in self, if its a tensor, send to cuda
         # self.matvec = lambda x, y: x.mv(y.to(torch.float16)).to(runtimedtype)
