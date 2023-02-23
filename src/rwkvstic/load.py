@@ -3,7 +3,7 @@ from rwkvstic.agnostic.agnosticRwkvLeg import LegacyRWKV
 from rwkvstic.helpers.loadWeights import loadWeights
 from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends import Backends
-from rwkvstic.interOpLoaders import tflite, torchscript, prequantized, preJax, rwkvRs
+from rwkvstic.interOpLoaders import tflite, torchscript, prequantized, preJax, rwkvRs, onnx
 from rwkvstic.rwkvMaster import RWKVMaster
 import gc
 from typing import Tuple
@@ -20,7 +20,7 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
         files = os.listdir()
         # filter by ending in .pth
         files = [f for f in files if f.endswith(
-            ".pth") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth") or f.endswith(".jax.npy") or f.endswith(".safetensors")]
+            ".pth") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth") or f.endswith(".jax.npy") or f.endswith(".safetensors") or f.endswith(".onnx")]
 
         questions = [
             inquirer.List('file',
@@ -52,6 +52,8 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
         return prequantized.loadPreQuantized(path, tokenizer)
     elif path.endswith(".jax.npy"):
         return preJax.loadPreJax(path, tokenizer)
+    elif path.endswith(".onnx"):
+        return onnx.initONNXFile(path, tokenizer)
 
     if mode is None:
         mode: str = inquirer.prompt([inquirer.List('mode',

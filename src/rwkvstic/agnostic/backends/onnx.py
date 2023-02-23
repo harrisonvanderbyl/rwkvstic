@@ -5,15 +5,38 @@ import rwkvstic.agnostic.backends.base as RWKVOp
 
 class RWKVOnnxOps(RWKVOp.module):
 
-    def __init__(self, layers, embed, *args, **kwargs):
+    def __init__(self, layers, embed, *args, dtype=None, **kwargs):
         import onnx
 
         super().__init__(layers, embed, *args, **kwargs)
         print("embed ", embed)
+        import torch
+        if dtype is None:
+            import inquirer
 
-        dtype = onnx.TensorProto.FLOAT
+            questions = [
+                inquirer.List('dtype',
+                              message="What dtype do you want to use?",
+                              choices=[torch.float32,
+                                       torch.float16],
+
+                              ),
+            ]
+            dtype = inquirer.prompt(questions)["dtype"]
+
+        dtype = onnx.TensorProto.FLOAT if dtype == np.float32 else onnx.TensorProto.FLOAT16 if dtype == torch.float16 else onnx.TensorProto.BFLOAT16 if dtype == torch.bfloat16 else onnx.TensorProto.FLOAT
+        nptype = np.float32 if dtype == onnx.TensorProto.FLOAT else np.float16 if dtype == onnx.TensorProto.FLOAT16 else np.float16 if dtype == onnx.TensorProto.BFLOAT16 else np.float32
 
         self.nm = 0
+        exportname = f"RWKV_{layers}_{embed}.onnx"
+        externalname = f"RWKV_{layers}_{embed}.bin"
+
+        # remove old files
+        import os
+        if os.path.exists(exportname):
+            os.remove(exportname)
+        if os.path.exists(externalname):
+            os.remove(externalname)
 
         self.TensorList = []
         self.NodeList = []
@@ -22,12 +45,25 @@ class RWKVOnnxOps(RWKVOp.module):
             name = f"PreTrainedTensor_{self.nm}"
             self.nm += 1
             if isinstance(x, list):
-                xx = np.array(x)
+                xx = np.array(x).astype(nptype)
             else:
                 xx = x.squeeze().float().cpu().numpy()
                 # convert to float32
-                xx = xx.astype(np.float32)
-            rrx = (name, xx)
+                xx = xx.astype(nptype)
+            rrx = onnx.helper.make_tensor(
+                name,
+                dtype,
+                xx.shape,
+                xx.tobytes(),
+                raw=True
+
+            )
+
+            onnx.external_data_helper.set_external_data(
+                rrx,
+                location=externalname,
+
+            )
 
             self.TensorList.append(rrx)
             return name
@@ -291,7 +327,7 @@ class RWKVOnnxOps(RWKVOp.module):
         self.getIndex = getIndex
 
         # convert to float32
-        self.emptyState = np.array(self.emptyState, dtype=np.float32)
+        self.emptyState = np.array(self.emptyState, dtype=nptype)
 
         # self.zero = initTensor([0.0]*embed)
 
@@ -322,117 +358,32 @@ class RWKVOnnxOps(RWKVOp.module):
                 # Graph input
 
                 inputs=[inputtensor[0], * \
-                        list(map(lambda x:x[0], emptyState)), *[onnx.helper.make_tensor_value_info(x[0],
-                                                                                                   dtype,
-                                                                                                   x[1].shape) for x in self.TensorList]],
+                        list(map(lambda x:x[0], emptyState))],
 
                 outputs=[logits, *state],  # Graph output
 
+                initializer=self.TensorList,  # initializer
+
+
 
                 # did not work, needs to be external
-
-                # external_initializers=list(
-                #     map(lambda x: x[0], self.TensorList))
-
 
             )
 
             modelDef = onnx.helper.make_model(
                 graph_def, producer_name="rwkvstic",
+
+
             )
-
-            # onnx.external_data_helper.convert_model_to_external_data(
-            #     modelDef, location="onnx")
-            # # make all initializers external
-
-            # onnx.external_data_helper.write_external_data_tensors(
-            #     modelDef, "onnx")
 
             modelDef.opset_import[0].version = 17
 
-            model_def = onnx.shape_inference.infer_shapes(modelDef)
-
-            # onnx.checker.check_model(model_def)
-
-            # onnx.save(proto=model_def,
-            #           save_as_external_data=True, f="model.onnx", location="model.bin", size_threshold=0, all_tensors_to_one_file=True, convert_attribute=True)
-
-            # make temp dir
-            # import os
-            # try:
-            #     os.mkdir("onnx")
-            # except:
-            #     pass
-            if (False):
-                # save all tensors with onnx
-                for i in self.TensorList:
-                    print(i)
-                    onnx.save_tensor(i, f"onnx/{i.name}.onnx")
-
-                # zip all tensors
-                import zipfile
-                with zipfile.ZipFile('onnx.zip', 'w') as zipObj:
-                    # Iterate over all the files in directory
-                    for folderName, subfolders, filenames in os.walk('onnx'):
-                        for filename in filenames:
-                            # create complete filepath of file in directory
-                            filePath = os.path.join(folderName, filename)
-                            # Add file to zip
-                            zipObj.write(filePath, filename)
-
-                    # add model
-                    zipObj.write("model.onnx", "model.onnx")
-
-                # delete temp dir
-                import shutil
-                shutil.rmtree("onnx")
+            onnx.save(modelDef, exportname)
 
             # run model
-            import onnxruntime as rt
-
-            # session execution provider options
-            sess_options = rt.SessionOptions()
-            # for x in self.TensorList:
-            #     sess_options.add_initializer(x[0], rt.OrtValue.ortvalue_from_numpy(
-            #         x[1]))
-            # create session providers
-            # print all providers
-            print(rt.get_available_providers())
-            providers = ["CPUExecutionProvider"]
-
-            sess = rt.InferenceSession(
-                model_def.SerializeToString(), sess_options, providers=providers)
-
-            ins = {
-
-            }
-            for i in range(self.TensorList.__len__()):
-                ins[self.TensorList[i][0]
-                    ] = self.TensorList[i][1].astype(np.float32)
-
-            class interOp():
-                def forward(selff, xi, statei):
-                    # print(statei[0][23])
-                    # create inputs
-                    inputs = ins
-                    # get input names
-                    input_names = [inputtensor[1], *
-                                   list(map(lambda x: x[1], emptyState)), *[x[0] for x in self.TensorList]]
-                    # get output names
-                    output_names = [outs[0], *outs[1]]
-                    # print(output_names)
-
-                    # create input dict
-                    inputs[input_names[0]] = np.array([xi[-1]], dtype=np.int32)
-                    for i in range(5*layers):
-                        inputs[input_names[i+1]] = statei[i]
-
-                    outputs = sess.run(output_names, inputs)
-                    # print(outputs[1][23])
-
-                    return outputs[0], outputs[1:]
-
-            return interOp()
+            print("Model saved to: ", exportname, " and is ready to be run")
+            print("Data type: ", dtype)
+            print("Embedding size: ", embed)
+            print("Number of layers: ", layers)
+            print("external data: ", externalname)
         self.postProcessModule = ppm
-
-# In the code above, the error was in line

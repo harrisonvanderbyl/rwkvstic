@@ -18,7 +18,7 @@ Backends: Dict[str, module] = {
     "export-torchscript": RWKVPTTSExportOps,
     "export-tensorflow": RWKVTFExport,
     "pytorch-compatibility(cpu/debug)": RWKVPTCompatOps,
-    "onnx": RWKVOnnxOps,
+    "onnx_export": RWKVOnnxOps,
     "coreml": RWKVCoreMLOps
 }
 
@@ -32,7 +32,8 @@ TORCH_STREAM = "pytorch-stream(gpu-config-vram)"
 TORCH_SPLIT = "pytorch-split(2xgpu)"
 TORCH_EXPORT = "export-torchscript"
 TF_EXPORT = "export-tensorflow"
+ONNX_EXPORT = "onnx_export"
 TORCH_COMPAT = "pytorch-compatibility(cpu/debug)"
 NUMPY = "numpy(cpu)"
-ONNX = "onnx"
+
 COREML = "coreml"
