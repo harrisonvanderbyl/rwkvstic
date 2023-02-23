@@ -399,3 +399,25 @@ from rwkvstic.load import RWKV
 
 model = RWKV("model.pqth")
 ```
+
+## Onnx export
+
+You can export the model to onnx, and then use onnxruntime/rwkvstic to infer the model.
+
+```python
+from rwkvstic.load import RWKV
+from rwkvstic.agnostic.backends import ONNX_EXPORT
+import torch
+
+model = RWKV("model.pth", backend=ONNX_EXPORT, dtype=torch.float16) # or torch.float32
+# the model is exported to model_{layers}_{embed}.onnx
+# the external data is stored in model_{layers}_{embed}.bin
+```
+
+### rwkvstic onnx running
+
+```py
+from rwkvstic.load import RWKV
+
+model = RWKV("model_12_768.onnx")
+```
