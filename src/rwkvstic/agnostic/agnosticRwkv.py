@@ -63,8 +63,8 @@ def AgnostigRWKV(ops: module, *args):
             v = ops.matvec(self.value[xx], ops.lerp(
                 statea, xy, self.vvtv[xx]))
 
-            r = ops.logistical(ops.matvec(
-                self.receptance[xx], ops.lerp(statea, xy, self.rrtr[xx])))
+            r = ops.logistical(ops.neg(ops.matvec(
+                self.receptance[xx], ops.lerp(statea, xy, self.rrtr[xx]))))
 
             kt = ops.exp(ops.minimum(
                 ops.add(kk, self.time_first[xx]), ops.klimit))
@@ -84,8 +84,8 @@ def AgnostigRWKV(ops: module, *args):
             km = ops.relu(ops.matvec(self.key_ffn[xx], ops.lerp(
                 stated, ddd, self.time_mix_k_ffn[xx])))
 
-            rt = ops.logistical(ops.matvec(self.receptance_ffn[xx], ops.lerp(
-                stated, ddd, self.time_mix_r_ffn[xx])))
+            rt = ops.logistical(ops.neg(ops.matvec(self.receptance_ffn[xx], ops.lerp(
+                stated, ddd, self.time_mix_r_ffn[xx]))))
 
             x = ops.add(mvv, ops.multiply(
                 ops.matvec(self.value_ffn[xx], ops.multiply(km, km)), rt))

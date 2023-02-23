@@ -18,7 +18,7 @@ class RWKVOnnxOps(RWKVOp.module):
         self.TensorList = []
         self.NodeList = []
 
-        def initTensor(x, cdtype=dtype):
+        def initTensor(x):
             name = f"PreTrainedTensor_{self.nm}"
             self.nm += 1
             if isinstance(x, list):
@@ -167,7 +167,7 @@ class RWKVOnnxOps(RWKVOp.module):
         self.one = initTensor([1.0]*embed)
 
         def lerpx(x, y, z):
-            return self.add(self.multiply(x, z), self.multiply(y, self.subtract(self.one, z)))
+            return self.add(self.multiply(y, z), self.multiply(x, self.subtract(self.one, z)))
 
         self.lerp = lerpx
 
@@ -247,6 +247,20 @@ class RWKVOnnxOps(RWKVOp.module):
 
         self.stackEmbed = False
 
+        def neg(x):
+            name = f"neg_{self.nm}_out"
+            self.nm += 1
+            node = onnx.helper.make_node(
+                'Neg',
+                inputs=[x],
+                outputs=[name]
+            )
+            self.NodeList.append(node)
+
+            return name
+
+        self.neg = neg
+
         def logistic(x):
             name = f"logistic_{self.nm}_out"
             self.nm += 1
@@ -258,7 +272,6 @@ class RWKVOnnxOps(RWKVOp.module):
             self.NodeList.append(node)
 
             return name
-
         self.logistical = logistic
 
         def maximum(x, y):

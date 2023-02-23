@@ -54,8 +54,10 @@ class module:
         print(self.emptyState.shape)
 
         def logistical(x: self.VectorType) -> self.VectorType:
-            return 1 / (self.exp(x) + 1)
+            return 1 / (self.exp(-x) + 1)
+
         self.logistical = logistical
+        self.neg = lambda x: -x
         self.postProcessModule = lambda x: x
 
         self.sample = npsample

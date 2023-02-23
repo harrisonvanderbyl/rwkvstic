@@ -16,7 +16,7 @@ class RWKVNumpyOps(RWKVOp.module):
         self.matvec = np.matmul
         self.lerp = lambda x, y, z: x*(1-z) + y*(z)
         self.minimum = lambda x, y: np.minimum(x, y)
-        self.minimum = lambda x, y: np.maximum(x, y)
+        self.maximum = lambda x, y: np.maximum(x, y)
         self.klimit = [18] * embed
         # module def
         self.module = object

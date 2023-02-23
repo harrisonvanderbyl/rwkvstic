@@ -48,6 +48,7 @@ class RWKVPTOps(RWKVOp.module):
         self.initfunc = lambda x: x
         self.layerdef = lambda x: x
         self.mainfunc = lambda x: x
+        self.logistical = lambda x: torch.sigmoid(x)
         self.postProcessTensor = lambda x: x.float().cpu()
 
         # self.postProcessModule = ppm
@@ -262,7 +263,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
 class RWKVStreamBigOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, *args, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None, pinMem=None, **kwargs):
+    def __init__(self, layers, embed, *args, runtimedtype=torch.float32, dtype=torch.bfloat16, target=None, pinMem=True, **kwargs):
         import inquirer
         import torch
         super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
