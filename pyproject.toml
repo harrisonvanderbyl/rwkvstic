@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
 name = "rwkvstic"
-version = "0.6.0"
+version = "0.7.0"
 authors = [
   { name="Harrison Vanderbyl", email="harrison.vanderbyl@gmail.com" },
 ]

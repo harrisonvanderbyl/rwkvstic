@@ -178,7 +178,7 @@ The model has an internal state, so the following is useful in that regards.
 ```python
 model = RWKV("path/to/model.pth")
 
-emptyState = model.emptyState()
+emptyState = model.emptyState
 model.setState(emptyState)
 currentMem = model.getState()
 ```
