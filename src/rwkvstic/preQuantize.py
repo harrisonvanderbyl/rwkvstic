@@ -28,7 +28,7 @@ def preQuantized(path=None, chunksize=32, useLogFix=True) -> RWKVMaster:
 
     mode = "pytorch-quant(gpu-8bit)"
     ops, weights = loadWeights(
-        mode, path, runtimedtype=torch.bfloat16, chunksize=chunksize, useLogFix=useLogFix, useGPU=True, processEmb=True)
+        mode, path, runtimedtype=torch.float32, chunksize=chunksize, useLogFix=useLogFix, useGPU=True, processEmb=True)
 
     gc.collect()
     torch.cuda.empty_cache()
