@@ -30,6 +30,7 @@ class RWKVTFOps(RWKVOp.module):
         self.exp = tf.exp
         self.stack = tf.stack
         self.matvec = tf.linalg.matvec
+        self.prod = lambda x: tf.reduce_prod(x, axis=1)
         self.klimit = tf.convert_to_tensor(
             [30]*embed, dtype=tf.float32
         )

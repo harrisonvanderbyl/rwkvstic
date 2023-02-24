@@ -47,7 +47,7 @@ def initONNXFile(path, tokenizer=None):
 
             # create input dict
             inputs[input_names[0]] = np.array([xi[-1]], dtype=np.int32)
-            for i in range(5*layers):
+            for i in range(len(input_names)-1):
                 inputs[input_names[i+1]] = statei[i]
 
             outputs = sess.run(output_names, inputs)
@@ -58,7 +58,7 @@ def initONNXFile(path, tokenizer=None):
 
     # emptyState = []
     emptyState = [
-        np.array([0.01]*int(embed)).astype(typenum)]*int(5*layers)
+        np.array([0.01]*int(embed)).astype(typenum)]*len(sess.get_inputs()[1:])
 
     def initTensor(x): return np.array(x, dtype=typenum)
     return RWKVMaster(model, emptyState, initTensor, npsample, tokenizer)

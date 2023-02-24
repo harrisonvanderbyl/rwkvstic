@@ -31,6 +31,7 @@ class module:
         self.subtract = lambda x, y: x-y
         self.stack = raiseNotImplemented
         self.matvec = raiseNotImplemented
+        self.prod = raiseNotImplemented
         self.layernorm = raiseNotImplemented
 
         self.lerp = raiseNotImplemented

@@ -14,9 +14,11 @@ class RWKVNumpyOps(RWKVOp.module):
         self.exp = np.exp
         self.stack = lambda x: x
         self.matvec = np.matmul
+        self.prod = lambda x: np.prod(x, axis=1)
         self.lerp = lambda x, y, z: x*(1-z) + y*(z)
         self.minimum = lambda x, y: np.minimum(x, y)
         self.maximum = lambda x, y: np.maximum(x, y)
+
         self.klimit = [18] * embed
         # module def
         self.module = object
@@ -50,6 +52,7 @@ class RWKVJaxOps(RWKVOp.module):
         self.exp = lambda x: npjax.exp(x)
         self.stack = lambda x: x
         self.matvec = npjax.matmul
+        self.prod = lambda x: npjax.prod(x, axis=1)
         self.lerp = lambda x, y, z: x*(1-z) + y*(z)
         self.minimum = lambda x, y: npjax.minimum(x, y)
         self.maximum = lambda x, y: npjax.maximum(x, y)

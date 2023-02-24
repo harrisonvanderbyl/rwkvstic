@@ -1,6 +1,8 @@
 from rwkvstic.agnostic.backends.base import module
 from typing import Dict
 
+import torch
+
 
 def AgnostigRWKV(ops: module, *args):
     class myRWKV(ops.module):
@@ -57,35 +59,53 @@ def AgnostigRWKV(ops: module, *args):
         def doLayer(self, x, statea, stateb, statec, stated, xx):
             xy = ops.layernorm(x, self.ln1w[xx], self.ln1b[xx])
 
-            kk = ops.matvec(
-                self.key[xx], ops.lerp(statea, xy, self.kktk[xx]))
+            xyz = ops.subtract(xy, statea)
 
-            v = ops.matvec(self.value[xx], ops.lerp(
-                statea, xy, self.vvtv[xx]))
+            kv = ops.add(statea, ops.multiply(
+                xyz, self.kktk[xx]))
+
+            kk = ops.exp(ops.multiply(
+                self.key[xx], kv))
+
+            mv = ops.add(statea, ops.multiply(
+                xyz, self.vvtv[xx]))
+
+            v = ops.matvec(self.value[xx], mv)
+
+            rv = ops.add(statea, ops.multiply(
+                xyz, self.rrtr[xx]))
 
             r = ops.logistical(ops.neg(ops.matvec(
-                self.receptance[xx], ops.lerp(statea, xy, self.rrtr[xx]))))
+                self.receptance[xx], rv)))
 
-            kt = ops.exp(ops.minimum(
-                ops.add(kk, self.time_first[xx]), ops.klimit))
-            k = ops.exp(ops.minimum(kk, ops.klimit))
+            k = ops.prod(kk)
+
+            # replace inf with max value
+            torch.clamp(k, min=-1e10, max=1e10)
 
             wrd = ops.divide(
-                ops.add(stateb, ops.multiply(kt, v)), ops.add(statec, kt))
-            outb = ops.add(ops.multiply(
-                stateb, self.time_decay[xx]), ops.multiply(k, v))
-            outc = ops.add(ops.multiply(statec, self.time_decay[xx]), k)
+                ops.add(stateb, ops.multiply(ops.multiply(k, v), self.time_first[xx])), ops.add(statec, ops.multiply(k, self.time_first[xx])))
+            outb = ops.multiply(self.time_decay[xx], ops.add(
+                stateb, ops.multiply(k, v)))
+            outc = ops.multiply(ops.add(statec, k), self.time_decay[xx])
 
             mvv = ops.add(x, ops.matvec(
                 self.outputvv[xx], ops.multiply(r, wrd)))
 
             ddd = ops.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
 
-            km = ops.relu(ops.matvec(self.key_ffn[xx], ops.lerp(
-                stated, ddd, self.time_mix_k_ffn[xx])))
+            mxyz = ops.subtract(ddd, stated)
 
-            rt = ops.logistical(ops.neg(ops.matvec(self.receptance_ffn[xx], ops.lerp(
-                stated, ddd, self.time_mix_r_ffn[xx]))))
+            kmv = ops.add(stated, ops.multiply(
+                mxyz, self.time_mix_k_ffn[xx]))
+
+            km = ops.relu(ops.matvec(self.key_ffn[xx], kmv))
+
+            rtx = ops.add(stated, ops.multiply(
+                mxyz, self.time_mix_r_ffn[xx]))
+
+            rt = ops.logistical(
+                ops.neg(ops.matvec(self.receptance_ffn[xx], rtx)))
 
             x = ops.add(mvv, ops.multiply(
                 ops.matvec(self.value_ffn[xx], ops.multiply(km, km)), rt))
@@ -99,7 +119,8 @@ def AgnostigRWKV(ops: module, *args):
                 state = ops.emptyState
 
             x = ops.layernorm(
-                ops.processEmbed(self.emb[x[-1]]), self.emb1, self.emb2)
+                ops.processEmbed(ops.getIndex(self.emb, x)),
+                self.emb1, self.emb2)
 
             statea = state[0::4]
             stateb = state[1::4]

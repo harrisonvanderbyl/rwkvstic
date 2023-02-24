@@ -35,6 +35,7 @@ class RWKVPTOps(RWKVOp.module):
         self.relu = torch.relu
         self.stack = lambda x: x
         self.matvec = torch.mv
+        self.prod = lambda x: torch.prod(x, dim=1)
         # safe log
         self.log = lambda x: torch.complex(x, torch.zeros_like(x)).log()
 

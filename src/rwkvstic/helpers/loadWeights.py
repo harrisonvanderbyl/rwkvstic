@@ -65,8 +65,11 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
             if not ops.useLogFix:
                 w[x] = torch.exp(w[x])
 
+        if "time_fir" in x and not ops.useLogFix:
+            w[x] = torch.exp(w[x].double())
+
         if 'receptance.weight' in x:
-            w[x] = -w[x]
+            w[x] = w[x]
 
     # Transform Weights from backend
     for x in tqdm(list(w.keys())):

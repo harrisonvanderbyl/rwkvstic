@@ -145,6 +145,24 @@ class RWKVOnnxOps(RWKVOp.module):
 
         self.matvec = matvec
 
+        def prod(x):
+            name = f"prod_{self.nm}_out"
+            self.nm += 1
+            node = onnx.helper.make_node(
+                'ReduceProd',
+                inputs=[x],
+                outputs=[name],
+                axes=[1],
+                keepdims=0
+
+
+            )
+            self.NodeList.append(node)
+
+            return name
+
+        self.prod = prod
+
         def mul(x, y):
             name = f"mul_{self.nm}_out"
             self.nm += 1
@@ -203,7 +221,7 @@ class RWKVOnnxOps(RWKVOp.module):
         self.one = initTensor([1.0]*embed)
 
         def lerpx(x, y, z):
-            return self.add(self.multiply(y, z), self.multiply(x, self.subtract(self.one, z)))
+            return self.add(x, self.multiply(self.subtract(y, x), z))
 
         self.lerp = lerpx
 
@@ -338,7 +356,7 @@ class RWKVOnnxOps(RWKVOp.module):
 
             emptyState = list(map(lambda x: (onnx.helper.make_tensor_value_info("instate"+str(x),
                                                                                 dtype,
-                                                                                [embed]), "instate"+str(x)), range(5*layers)))
+                                                                                [embed]), "instate"+str(x)), range((4+self.useLogFix)*layers)))
             outs = x.forward(
                 inputtensor[1], list(map(lambda x: x[1], emptyState)))
             print(self.TensorList.__len__())
