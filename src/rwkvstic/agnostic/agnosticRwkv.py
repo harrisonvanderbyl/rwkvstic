@@ -75,13 +75,10 @@ def AgnostigRWKV(ops: module, *args):
             rv = ops.add(statea, ops.multiply(
                 xyz, self.rrtr[xx]))
 
-            r = ops.logistical(ops.neg(ops.matvec(
+            r = ops.logistical((ops.matvec(
                 self.receptance[xx], rv)))
 
             k = ops.prod(kk)
-
-            # replace inf with max value
-            torch.clamp(k, min=-1e10, max=1e10)
 
             wrd = ops.divide(
                 ops.add(stateb, ops.multiply(ops.multiply(k, v), self.time_first[xx])), ops.add(statec, ops.multiply(k, self.time_first[xx])))
@@ -105,7 +102,7 @@ def AgnostigRWKV(ops: module, *args):
                 mxyz, self.time_mix_r_ffn[xx]))
 
             rt = ops.logistical(
-                ops.neg(ops.matvec(self.receptance_ffn[xx], rtx)))
+                (ops.matvec(self.receptance_ffn[xx], rtx)))
 
             x = ops.add(mvv, ops.multiply(
                 ops.matvec(self.value_ffn[xx], ops.multiply(km, km)), rt))

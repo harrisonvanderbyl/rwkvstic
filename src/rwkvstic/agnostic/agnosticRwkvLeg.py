@@ -8,6 +8,7 @@ def LegacyRWKV(ops: module, *args):
         @ ops.initfunc
         def __init__(self, w: Dict[str, ops.TensorType]):
             super(myRWKV, self).__init__()
+            print("Legacy RWKV")
 
             self.ops = ops
             self.postprocess0: ops.VectorType = (w["ln_out.weight"])
@@ -65,7 +66,7 @@ def LegacyRWKV(ops: module, *args):
                 statea, xy, self.vvtv[xx]))
             rr = ops.matvec(
                 self.receptance[xx], ops.lerp(statea, xy, self.rrtr[xx]))
-            r = ops.logistical(ops.neg(rr))
+            r = ops.logistical((rr))
 
             ww = ops.add(k, self.time_first[xx])
             p = ops.maximum(statee, ww)
@@ -93,7 +94,7 @@ def LegacyRWKV(ops: module, *args):
             km = ops.relu(ops.matvec(self.key_ffn[xx], ops.lerp(
                 stated, ddd, self.time_mix_k_ffn[xx])))
 
-            rt = ops.logistical(ops.neg(ops.matvec(self.receptance_ffn[xx], ops.lerp(
+            rt = ops.logistical((ops.matvec(self.receptance_ffn[xx], ops.lerp(
                 stated, ddd, self.time_mix_r_ffn[xx]))))
 
             x = ops.add(mvv, ops.multiply(

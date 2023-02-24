@@ -49,7 +49,7 @@ class RWKVPTOps(RWKVOp.module):
         self.initfunc = lambda x: x
         self.layerdef = lambda x: x
         self.mainfunc = lambda x: x
-        self.logistical = lambda x: torch.sigmoid(x)
+        # self.logistical = lambda x: torch.sigmoid(x)
         self.postProcessTensor = lambda x: x.float().cpu()
 
         # self.postProcessModule = ppm
