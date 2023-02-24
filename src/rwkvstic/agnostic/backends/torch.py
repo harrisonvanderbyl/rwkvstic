@@ -246,6 +246,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
         self.matvec = matvec
 
+        self.stackEmb = True
+
         self.klimit = self.klimit.to(dtype=runtimedtype, device=dev)
 
         self.emptyState = self.emptyState.to(dtype=runtimedtype, device=dev)
