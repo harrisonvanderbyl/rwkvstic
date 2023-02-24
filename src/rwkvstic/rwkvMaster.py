@@ -79,10 +79,12 @@ class RWKVMaster():
         return self.tokenizer.encode(x)
 
     def setState(self, state):
-        self.myState = state
+        self.myState = state[0]
+        self.lastToken = state[1]
 
     def getState(self):
-        return self.myState
+        return self.myState, self.lastToken
 
     def resetState(self):
         self.myState = self.emptyState
+        self.lastToken = 187

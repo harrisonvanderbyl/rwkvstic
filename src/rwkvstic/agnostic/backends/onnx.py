@@ -404,4 +404,5 @@ class RWKVOnnxOps(RWKVOp.module):
             print("Embedding size: ", embed)
             print("Number of layers: ", layers)
             print("external data: ", externalname)
+            exit()
         self.postProcessModule = ppm
