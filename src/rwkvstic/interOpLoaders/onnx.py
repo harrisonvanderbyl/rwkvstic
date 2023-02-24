@@ -10,7 +10,10 @@ def initONNXFile(path, tokenizer=None):
     sess_options = rt.SessionOptions()
 
     print(rt.get_available_providers())
-    providers = ["CPUExecutionProvider"]
+    import inquirer
+    providers = inquirer.checkbox(
+        "Select execution providers", choices=rt.get_available_providers())
+    print(providers)
 
     sess = rt.InferenceSession(
         path, sess_options, providers=providers)
