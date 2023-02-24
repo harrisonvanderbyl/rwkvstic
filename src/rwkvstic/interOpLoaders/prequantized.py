@@ -20,7 +20,7 @@ def loadPreQuantized(path, tokenizer=None):
         ww = ww[1].split(".")
         if int(ww[0]) > n_layers:
             n_layers = int(ww[0])
-        if weights[weight].dtype == torch.bfloat16:
+        if isinstance(weights[weight], torch.tensor) & weights[weight].dtype == torch.bfloat16:
             weights[weight] = weights[weight].to(torch.float64)
 
     ops = RWKVCudaQuantOps(
