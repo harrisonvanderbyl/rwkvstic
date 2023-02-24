@@ -22,7 +22,7 @@ def loadPreQuantized(path, tokenizer=None):
             n_layers = int(ww[0])
 
     ops = RWKVCudaQuantOps(
-        preQuantized=True, embed=len(weights["blocks.0.ln2.weight"]), layers=(n_layers+1), chunksize=32, target=100, maxQuantTarget=100, useLogFix="logfix" in path, useGPU=torch.cuda.is_available(), runtimedtype=torch.bfloat16)
+        preQuantized=True, embed=len(weights["blocks.0.ln2.weight"]), layers=(n_layers+1), chunksize=32, target=100, maxQuantTarget=100, useLogFix="logfix" in path, useGPU=torch.cuda.is_available(), runtimedtype=torch.float64)
     if "logfix" in path:
         model = LegacyRWKV(ops, weights)
     else:
