@@ -71,7 +71,7 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
     emptyState = ops.emptyState
     initTensor = ops.initTensor
 
-    ret = RWKVMaster(model, emptyState, initTensor,
+    ret = RWKVMaster(model, emptyState, initTensor, ops.intTensor,
                      ops.sample, tokenizer)
 
     return ret

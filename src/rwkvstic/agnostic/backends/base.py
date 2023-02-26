@@ -25,10 +25,15 @@ class module:
         self.relu = raiseNotImplemented
         self.exp = raiseNotImplemented
         self.maximum = raiseNotImplemented
-        self.add = lambda x, y: x+y
-        self.divide = lambda x, y: x/y
-        self.multiply = lambda x, y: x*y
-        self.subtract = lambda x, y: x-y
+        def add(x, y): return x+y
+        def divide(x, y): return x/y
+        def multiply(x, y): return x*y
+        def subtract(x, y): return x-y
+        self.intTensor = lambda x: x
+        self.add = add
+        self.divide = divide
+        self.multiply = multiply
+        self.subtract = subtract
         self.stack = raiseNotImplemented
         self.matvec = raiseNotImplemented
         self.prod = raiseNotImplemented
@@ -47,7 +52,9 @@ class module:
         # tensorflow function defs
         self.initfunc = lambda x: x
         self.layerdef = lambda x: x
+
         self.mainfunc = lambda x: x
+
         import numpy as np
         self.emptyState: self.MatrixType = np.array((([[0.00]*embed, [0.00]*embed, [0.00]*embed, [
             0.00]*embed]+([[-1e30]*embed] if self.useLogFix else [])))*layers)
@@ -63,10 +70,15 @@ class module:
 
         self.sample = npsample
 
+        self.roll = raiseNotImplemented
         # typing, set as any
 
         self.tensorDef = None
 
+        def len(x): return len(x)
+        self.len = len
+
         self.stackEmb = False
 
-        self.getIndex = lambda x, y: x[y]
+        def getIndex(x, y): return x[y]
+        self.getIndex = getIndex

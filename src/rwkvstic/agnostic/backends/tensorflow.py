@@ -47,6 +47,7 @@ class RWKVTFOps(RWKVOp.module):
         self.initfunc = lambda x: x
         self.layerdef = tf.function(
             input_signature=[tf.TensorSpec(shape=[None, None], dtype=tf.float32)]+(4+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int64, shape=None)])
+
         self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[None], dtype=tf.int32), tf.TensorSpec(
             shape=[(4+self.useLogFix)*layers, embed], dtype=tf.float32)])
         self.emptyState = tf.convert_to_tensor(
@@ -59,6 +60,7 @@ class RWKVTFOps(RWKVOp.module):
 
         self.layernorm = ln
 
+        self.len = lambda x: tf.shape(x)[0]
         self.getIndex = lambda x, y: tf.gather(x, y, axis=0)
 
 

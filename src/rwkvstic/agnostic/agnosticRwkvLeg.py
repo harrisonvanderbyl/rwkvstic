@@ -10,7 +10,8 @@ def LegacyRWKV(ops: module, *args):
             super(myRWKV, self).__init__()
             print("Legacy RWKV")
 
-            self.ops = ops
+            for x in ops.__dict__.keys():
+                self.__dict__[x] = ops.__dict__[x]
             self.postprocess0: ops.VectorType = (w["ln_out.weight"])
             self.postprocess1: ops.VectorType = (w["ln_out.bias"])
             self.postprocess2: ops.VectorType = (w["head.weight"])
@@ -55,71 +56,72 @@ def LegacyRWKV(ops: module, *args):
                 w[f"blocks.{x}.ffn.value.weight"] for x in range(ops.n_layers)])
 
         @ops.layerdef
-        def doLayer(self, x, statea, stateb, statec, stated, statee, xx):
+        def doLayer(self, x, statea, stateb, statec, stated, statee, xx: int):
 
-            xy = ops.layernorm(x, self.ln1w[xx], self.ln1b[xx])
-            ct = ops.cat([ops.unsqueeze(statea, 0), xy[:-1]])
+            xy = self.layernorm(x, self.ln1w[xx], self.ln1b[xx])
 
-            k = ops.matvec(
-                self.key[xx], ops.lerp(ct, xy, self.kktk[xx]))
+            tc = self.roll(xy)
+            tc[0] = statea
 
-            v = ops.matvec(self.value[xx], ops.lerp(
-                ct, xy, self.vvtv[xx]))
-            rr = ops.matvec(
-                self.receptance[xx], ops.lerp(ct, xy, self.rrtr[xx]))
-            r = ops.logistical(rr)
+            k = self.matvec(
+                self.key[xx], self.lerp(tc, xy, self.kktk[xx]))
 
-            ww = ops.add(k, self.time_first[xx])
+            v = self.matvec(self.value[xx], self.lerp(
+                tc, xy, self.vvtv[xx]))
+            rr = self.matvec(
+                self.receptance[xx], self.lerp(tc, xy, self.rrtr[xx]))
+            r = self.logistical(rr)
+
+            ww = self.add(k, self.time_first[xx])
             rz = []
-            for i in range(len(x)):
-                p = ops.maximum(statee, ww[i])
+            for i in range(self.len(x)):
+                p = self.maximum(statee, ww[i])
 
-                e1 = ops.exp(ops.subtract(statee, p))
-                e2 = ops.exp(ops.subtract(ww[i], p))
-                a = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v[i]))
-                b = ops.add(ops.multiply(e1, statec), e2)
-                wwn = ops.add(statee, self.time_decay[xx])
+                e1 = self.exp(self.subtract(statee, p))
+                e2 = self.exp(self.subtract(ww[i], p))
+                a = self.add(self.multiply(e1, stateb),
+                             self.multiply(e2, v[i]))
+                b = self.add(self.multiply(e1, statec), e2)
+                wwn = self.add(statee, self.time_decay[xx])
 
-                p = ops.maximum(wwn, k[i])
+                p = self.maximum(wwn, k[i])
 
-                e1 = ops.exp(ops.subtract(wwn, p))
-                e2 = ops.exp(ops.subtract(k[i], p))
-                outb = ops.add(ops.multiply(e1, stateb),
-                               ops.multiply(e2, v[i]))
-                outc = ops.add(ops.multiply(e1, statec), e2)
+                e1 = self.exp(self.subtract(wwn, p))
+                e2 = self.exp(self.subtract(k[i], p))
+                outb = self.add(self.multiply(e1, stateb),
+                                self.multiply(e2, v[i]))
+                outc = self.add(self.multiply(e1, statec), e2)
                 eee = p
-                wkv = ops.divide(a, b)
+                wkv = self.divide(a, b)
                 rz.append(wkv)
                 statee = eee
                 stateb = outb
                 statec = outc
 
-            mvv = ops.add(x, ops.matvec(
-                self.outputvv[xx], ops.multiply(r, ops.stack(rz))))
+            mvv = self.add(x, self.matvec(
+                self.outputvv[xx], self.multiply(r, self.stack(rz))))
 
-            ddd = ops.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
+            ddd = self.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
 
-            ctt = ops.cat([ops.unsqueeze(stated, 0), ddd[:-1]])
+            rc = self.roll(ddd)
+            rc[0] = stated
 
-            km = ops.relu(ops.matvec(self.key_ffn[xx], ops.lerp(
-                ctt, ddd, self.time_mix_k_ffn[xx])))
+            km = self.relu(self.matvec(self.key_ffn[xx], self.lerp(
+                rc, ddd, self.time_mix_k_ffn[xx])))
 
-            rt = ops.logistical((ops.matvec(self.receptance_ffn[xx], ops.lerp(
-                ctt, ddd, self.time_mix_r_ffn[xx]))))
+            rt = self.logistical((self.matvec(self.receptance_ffn[xx], self.lerp(
+                rc, ddd, self.time_mix_r_ffn[xx]))))
 
-            x = ops.add(mvv, ops.multiply(
-                ops.matvec(self.value_ffn[xx], ops.multiply(km, km)), rt))
+            x = self.add(mvv, self.multiply(
+                self.matvec(self.value_ffn[xx], self.multiply(km, km)), rt))
 
-            return x, xy[-1], outb, outc, ddd[-1], eee
+            return x, xy[-1], stateb, statec, ddd[-1], statee
 
         @ ops.mainfunc
-        def forward(self, x: ops.VectorType, state: ops.MatrixType = None):
+        def forward(self, x, state):
 
-            if (state is None):
-                state = ops.emptyState
-
-            x = ops.layernorm(
-                ops.processEmbed(ops.getIndex(self.emb, x)),
+            x = self.layernorm(
+                self.processEmbed(self.getIndex(self.emb, x)),
                 self.emb1, self.emb2)
 
             statea = state[0::5]
@@ -130,16 +132,16 @@ def LegacyRWKV(ops: module, *args):
 
             ot = []
 
-            for i in range(ops.n_layers):
+            for i in range(self.n_layers):
                 x, aaa, bbb, ccc, ddd, eee = self.doLayer(
                     x, statea[i], stateb[i], statec[i], stated[i], statee[i], i)
 
                 ot = ot + [aaa, bbb, ccc, ddd, eee]
 
-            x = ops.matvec(self.postprocess2, ops.layernorm(x, self.postprocess0,
-                                                            self.postprocess1))
+            x = self.matvec(self.postprocess2, self.layernorm(x, self.postprocess0,
+                                                              self.postprocess1))
 
-            return ops.postProcessTensor(x[-1]), ops.stack(ot)
+            return self.postProcessTensor(x[-1]), self.stack(ot)
 
         # for keras stuff, ignore this if you are not using keras
         def call(self, *args, **kwds):

@@ -1,7 +1,6 @@
+import torch
 from rwkvstic.agnostic.backends.base import module
 from typing import Dict
-
-import torch
 
 
 def AgnostigRWKV(ops: module, *args):
@@ -10,8 +9,10 @@ def AgnostigRWKV(ops: module, *args):
         @ ops.initfunc
         def __init__(self, w: Dict[str, ops.TensorType]):
             super(myRWKV, self).__init__()
+            print("Legacy RWKV")
 
-            self.ops = ops
+            for x in ops.__dict__.keys():
+                self.__dict__[x] = ops.__dict__[x]
             self.postprocess0: ops.VectorType = (w["ln_out.weight"])
             self.postprocess1: ops.VectorType = (w["ln_out.bias"])
             self.postprocess2: ops.VectorType = (w["head.weight"])
@@ -56,67 +57,55 @@ def AgnostigRWKV(ops: module, *args):
                 w[f"blocks.{x}.ffn.value.weight"] for x in range(ops.n_layers)])
 
         @ops.layerdef
-        def doLayer(self, x, statea, stateb, statec, stated, xx):
-            xy = ops.layernorm(x, self.ln1w[xx], self.ln1b[xx])
+        def doLayer(self, x, statea, stateb, statec, stated, xx: int):
 
-            xyz = ops.subtract(xy, statea)
+            xy = self.layernorm(x, self.ln1w[xx], self.ln1b[xx])
+            ct = self.cat([self.unsqueeze(statea, 0), xy[:-1]])
 
-            kv = ops.add(statea, ops.multiply(
-                xyz, self.kktk[xx]))
+            kk = self.matvec(
+                self.key[xx], self.lerp(ct, xy, self.kktk[xx]))
 
-            kk = ops.exp(ops.multiply(
-                self.key[xx], kv))
+            v = self.matvec(self.value[xx], self.lerp(
+                ct, xy, self.vvtv[xx]))
+            rr = self.matvec(
+                self.receptance[xx], self.lerp(ct, xy, self.rrtr[xx]))
+            r = self.logistical(rr)
+            k = ops.exp(kk)
+            rz = []
+            for i in range(self.len(x)):
 
-            mv = ops.add(statea, ops.multiply(
-                xyz, self.vvtv[xx]))
+                wrd = ops.divide(
+                    ops.add(stateb, ops.multiply(ops.multiply(k[i], v[i]), self.time_first[xx])), ops.add(statec, ops.multiply(k[i], self.time_first[xx])))
 
-            v = ops.matvec(self.value[xx], mv)
+                stateb = ops.multiply(self.time_decay[xx], ops.add(
+                    stateb, ops.multiply(k[i], v[i])))
+                statec = ops.multiply(
+                    ops.add(statec, k[i]), self.time_decay[xx])
 
-            rv = ops.add(statea, ops.multiply(
-                xyz, self.rrtr[xx]))
+                rz += [wrd]
+            mvv = self.add(x, self.matvec(
+                self.outputvv[xx], self.multiply(r, self.stack(rz))))
 
-            r = ops.logistical((ops.matvec(
-                self.receptance[xx], rv)))
+            ddd = self.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
 
-            k = ops.prod(kk)
+            ctt = self.cat([self.unsqueeze(stated, 0), ddd[:-1]])
 
-            wrd = ops.divide(
-                ops.add(stateb, ops.multiply(ops.multiply(k, v), self.time_first[xx])), ops.add(statec, ops.multiply(k, self.time_first[xx])))
-            outb = ops.multiply(self.time_decay[xx], ops.add(
-                stateb, ops.multiply(k, v)))
-            outc = ops.multiply(ops.add(statec, k), self.time_decay[xx])
+            km = self.relu(self.matvec(self.key_ffn[xx], self.lerp(
+                ctt, ddd, self.time_mix_k_ffn[xx])))
 
-            mvv = ops.add(x, ops.matvec(
-                self.outputvv[xx], ops.multiply(r, wrd)))
+            rt = self.logistical((self.matvec(self.receptance_ffn[xx], self.lerp(
+                ctt, ddd, self.time_mix_r_ffn[xx]))))
 
-            ddd = ops.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
+            x = self.add(mvv, self.multiply(
+                self.matvec(self.value_ffn[xx], self.multiply(km, km)), rt))
 
-            mxyz = ops.subtract(ddd, stated)
-
-            kmv = ops.add(stated, ops.multiply(
-                mxyz, self.time_mix_k_ffn[xx]))
-
-            km = ops.relu(ops.matvec(self.key_ffn[xx], kmv))
-
-            rtx = ops.add(stated, ops.multiply(
-                mxyz, self.time_mix_r_ffn[xx]))
-
-            rt = ops.logistical(
-                (ops.matvec(self.receptance_ffn[xx], rtx)))
-
-            x = ops.add(mvv, ops.multiply(
-                ops.matvec(self.value_ffn[xx], ops.multiply(km, km)), rt))
-
-            return x, xy, outb, outc, ddd
+            return x, xy[-1], stateb, statec, ddd[-1]
 
         @ ops.mainfunc
-        def forward(self, x: ops.VectorType, state: ops.MatrixType = None):
+        def forward(self, x, state):
 
-            if (state is None):
-                state = ops.emptyState
-
-            x = ops.layernorm(
-                ops.processEmbed(ops.getIndex(self.emb, x)),
+            x = self.layernorm(
+                self.processEmbed(self.getIndex(self.emb, x)),
                 self.emb1, self.emb2)
 
             statea = state[0::4]
@@ -126,15 +115,16 @@ def AgnostigRWKV(ops: module, *args):
 
             ot = []
 
-            for i in range(ops.n_layers):
+            for i in range(self.n_layers):
                 x, aaa, bbb, ccc, ddd = self.doLayer(
                     x, statea[i], stateb[i], statec[i], stated[i], i)
+
                 ot = ot + [aaa, bbb, ccc, ddd]
 
-            x = ops.matvec(self.postprocess2, ops.layernorm(x, self.postprocess0,
-                                                            self.postprocess1))
+            x = self.matvec(self.postprocess2, self.layernorm(x, self.postprocess0,
+                                                              self.postprocess1))
 
-            return ops.postProcessTensor(x), ops.stack(ot)
+            return self.postProcessTensor(x[-1]), self.stack(ot)
 
         # for keras stuff, ignore this if you are not using keras
         def call(self, *args, **kwds):

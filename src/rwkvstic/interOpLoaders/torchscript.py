@@ -25,4 +25,4 @@ def initTorchScriptFile(path, tokenizer=None):
 
     useSampler = "sampler" not in path
 
-    return RWKVMaster(model, emptyState, initTensor, npsample if useSampler else None, tokenizer)
+    return RWKVMaster(model, emptyState, initTensor, torch.LongTensor, npsample if useSampler else None, tokenizer)
