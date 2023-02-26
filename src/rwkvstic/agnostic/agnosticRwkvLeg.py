@@ -59,7 +59,7 @@ def LegacyRWKV(ops: module, *args):
 
             xy = ops.stack(
                 [ops.layernorm(y, self.ln1w[xx], self.ln1b[xx]) for y in x])
-            ct = ops.cat([statea.unsqueeze(0), xy[1:]])
+            ct = ops.cat([statea.unsqueeze(0), xy[:-1]])
 
             k = ops.matvec(
                 self.key[xx], ops.lerp(ct, xy, self.kktk[xx]))
@@ -102,7 +102,7 @@ def LegacyRWKV(ops: module, *args):
                 [ops.layernorm(y, self.ln2w[xx], self.ln2b[xx]) for y in mvv]
             )
 
-            ctt = ops.cat([stated.unsqueeze(0), ddd[1:]])
+            ctt = ops.cat([stated.unsqueeze(0), ddd[:-1]])
 
             km = ops.relu(ops.matvec(self.key_ffn[xx], ops.lerp(
                 ctt, ddd, self.time_mix_k_ffn[xx])))
