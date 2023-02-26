@@ -28,8 +28,10 @@ class RWKVTFOps(RWKVOp.module):
         self.minimum = tf.minimum
         self.maximum = tf.maximum
         self.exp = tf.exp
+        self.unsqueeze = tf.expand_dims
         self.stack = tf.stack
-        self.matvec = tf.linalg.matvec
+        self.cat = lambda x: tf.concat(x, axis=0)
+        self.matvec = lambda x, y: tf.matmul(x, y, transpose_b=True)
         self.prod = lambda x: tf.reduce_prod(x, axis=1)
         self.klimit = tf.convert_to_tensor(
             [30]*embed, dtype=tf.float32
@@ -38,24 +40,26 @@ class RWKVTFOps(RWKVOp.module):
         self.lerp = lambda x, y, z: x*(1-z)+y*z
        # module def
         self.module = tf.Module
+
+        self.divide = tf.math.truediv
         # class def
        # tensorflow function defs
         self.initfunc = lambda x: x
         self.layerdef = tf.function(
-            input_signature=(5+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int64, shape=None)])
-        self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[1], dtype=tf.int32), tf.TensorSpec(
+            input_signature=[tf.TensorSpec(shape=[None, None], dtype=tf.float32)]+(4+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int64, shape=None)])
+        self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[None], dtype=tf.int32), tf.TensorSpec(
             shape=[(4+self.useLogFix)*layers, embed], dtype=tf.float32)])
         self.emptyState = tf.convert_to_tensor(
             self.emptyState, dtype=tf.float32)
 
         def ln(x, w, b):
-            xee2 = x - self.mean(x)
-
-            x2 = self.sqrt(self.mean(xee2*xee2) + 0.000009999999747378752)
-
-            return w*(xee2/x2) + b
+            # layernorm batchnorm
+            return tf.nn.batch_normalization(x, tf.reduce_mean(x, axis=1, keepdims=True), tf.math.reduce_std(
+                x, axis=1, keepdims=True), b, w, 1e-5)
 
         self.layernorm = ln
+
+        self.getIndex = lambda x, y: tf.gather(x, y, axis=0)
 
 
 class RWKVTFExport(RWKVTFOps):

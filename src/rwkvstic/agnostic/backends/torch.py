@@ -30,6 +30,7 @@ class RWKVPTOps(RWKVOp.module):
             [18] * embed).to(dtype=self.dtype)
         self.maximum = torch.maximum
         self.minimum = torch.minimum
+        self.unsqueeze = torch.unsqueeze
         self.sqrt = torch.sqrt
         self.mean = torch.mean
         self.relu = torch.relu
@@ -56,10 +57,19 @@ class RWKVPTOps(RWKVOp.module):
 
         # self.postProcessModule = ppm
 
-        def layernorm(x, w, b) -> torch.Tensor:
+        def ln(x, w, b):
+            # layernorm batchnorm
+            xee2 = x - self.mean(x, dim=1, keepdim=True)
 
-            return torch.layer_norm(x, w.shape, w, b)
-        self.layernorm = layernorm
+            x2 = self.sqrt(self.mean(xee2*xee2, dim=1, keepdim=True) +
+                           1e-5)
+            o = w*(xee2/x2) + b
+
+            return o
+            # nan on cuda
+            # return torch.nn.functional.layer_norm(x, x.shape, w.expand(x.shape), b.expand(x.shape))
+
+        self.layernorm = ln
         self.emptyState = torch.tensor(self.emptyState, dtype=self.dtype)
 
         self.TensorType = torch.Tensor
@@ -103,16 +113,17 @@ class RWKVCudaOps(RWKVPTOps):
             message="Dtype for non-matrix ops:",
             choices=[torch.bfloat16, torch.float32, torch.float64])])['type'] if runtimedtype is None else runtimedtype
 
-        self.exp = lambda x: torch.exp(x).to(dtype=runtimedtype)
+        def initTensor(x):
+            ret = x.to(dtype=self.dtype, device='cuda')
+            return ret
 
-        self.initTensor = lambda x: x.to(dtype=self.dtype if len(
-            x.shape) == 2 else runtimedtype, device='cuda')
+        self.initTensor = initTensor
         self.initCpuTensor = lambda x: x.to(dtype=runtimedtype)
-        self.processEmbed = lambda x: x.cuda(non_blocking=True)
-        self.klimit = self.klimit.to(dtype=runtimedtype, device='cuda')
+        self.processEmbed = lambda x: x.cuda(non_blocking=True).to(
+            dtype=runtimedtype)
 
-        self.matvec = lambda x, y: x.mv(
-            y.to(dtype=self.dtype)).to(dtype=runtimedtype)
+        self.matvec = lambda x, y: x.matmul(
+            y.to(dtype=self.dtype).t()).to(dtype=runtimedtype).t()
 
         self.emptyState = self.emptyState.to(dtype=runtimedtype, device='cuda')
 

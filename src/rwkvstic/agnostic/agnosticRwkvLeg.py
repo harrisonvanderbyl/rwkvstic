@@ -57,9 +57,8 @@ def LegacyRWKV(ops: module, *args):
         @ops.layerdef
         def doLayer(self, x, statea, stateb, statec, stated, statee, xx):
 
-            xy = ops.stack(
-                [ops.layernorm(y, self.ln1w[xx], self.ln1b[xx]) for y in x])
-            ct = ops.cat([statea.unsqueeze(0), xy[:-1]])
+            xy = ops.layernorm(x, self.ln1w[xx], self.ln1b[xx])
+            ct = ops.cat([ops.unsqueeze(statea, 0), xy[:-1]])
 
             k = ops.matvec(
                 self.key[xx], ops.lerp(ct, xy, self.kktk[xx]))
@@ -98,11 +97,9 @@ def LegacyRWKV(ops: module, *args):
             mvv = ops.add(x, ops.matvec(
                 self.outputvv[xx], ops.multiply(r, ops.stack(rz))))
 
-            ddd = ops.stack(
-                [ops.layernorm(y, self.ln2w[xx], self.ln2b[xx]) for y in mvv]
-            )
+            ddd = ops.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
 
-            ctt = ops.cat([stated.unsqueeze(0), ddd[:-1]])
+            ctt = ops.cat([ops.unsqueeze(stated, 0), ddd[:-1]])
 
             km = ops.relu(ops.matvec(self.key_ffn[xx], ops.lerp(
                 ctt, ddd, self.time_mix_k_ffn[xx])))
@@ -121,9 +118,9 @@ def LegacyRWKV(ops: module, *args):
             if (state is None):
                 state = ops.emptyState
 
-            x = ops.stack([ops.layernorm(
-                ops.processEmbed(z),
-                self.emb1, self.emb2) for z in ops.getIndex(self.emb, x)])
+            x = ops.layernorm(
+                ops.processEmbed(ops.getIndex(self.emb, x)),
+                self.emb1, self.emb2)
 
             statea = state[0::5]
             stateb = state[1::5]
