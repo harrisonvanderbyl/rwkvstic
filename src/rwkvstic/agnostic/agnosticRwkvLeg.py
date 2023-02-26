@@ -136,6 +136,7 @@ def LegacyRWKV(ops: module, *args):
             for i in range(ops.n_layers):
                 x, aaa, bbb, ccc, ddd, eee = self.doLayer(
                     x, statea[i], stateb[i], statec[i], stated[i], statee[i], i)
+                print(aaa[0], bbb[0], ccc[0], ddd[0], eee[0])
                 ot = ot + [aaa, bbb, ccc, ddd, eee]
 
             x = ops.matvec(self.postprocess2, ops.layernorm(x, self.postprocess0,
