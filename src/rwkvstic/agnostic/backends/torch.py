@@ -26,7 +26,7 @@ class RWKVPTOps(RWKVOp.module):
             return result
 
         self.initTensor = initTensor
-        self.intTensor = lambda x: torch.tensor(x, dtype=torch.int32)
+        self.intTensor = lambda x: torch.tensor(x, dtype=torch.int64)
         self.initCpuTensor = lambda x: self.initTensor(x).cpu()
         self.klimit = torch.tensor(
             [18] * embed).to(dtype=self.dtype)
