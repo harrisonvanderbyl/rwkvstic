@@ -33,8 +33,10 @@ class RWKVPTOps(RWKVOp.module):
         self.sqrt = torch.sqrt
         self.mean = torch.mean
         self.relu = torch.relu
-        self.stack = lambda x: x
-        self.matvec = torch.mv
+        self.stack = torch.stack
+        self.cat = torch.cat
+        self.matvec = lambda x, y: torch.matmul(x, y.t()).t()
+
         self.prod = lambda x: torch.prod(x, dim=1)
         # safe log
         self.log = lambda x: torch.complex(x, torch.zeros_like(x)).log()

@@ -57,50 +57,63 @@ def LegacyRWKV(ops: module, *args):
         @ops.layerdef
         def doLayer(self, x, statea, stateb, statec, stated, statee, xx):
 
-            xy = ops.layernorm(x, self.ln1w[xx], self.ln1b[xx])
+            xy = ops.stack(
+                [ops.layernorm(y, self.ln1w[xx], self.ln1b[xx]) for y in x])
+            ct = ops.cat([statea.unsqueeze(0), xy[1:]])
 
             k = ops.matvec(
-                self.key[xx], ops.lerp(statea, xy, self.kktk[xx]))
+                self.key[xx], ops.lerp(ct, xy, self.kktk[xx]))
 
             v = ops.matvec(self.value[xx], ops.lerp(
-                statea, xy, self.vvtv[xx]))
+                ct, xy, self.vvtv[xx]))
             rr = ops.matvec(
-                self.receptance[xx], ops.lerp(statea, xy, self.rrtr[xx]))
-            r = ops.logistical((rr))
+                self.receptance[xx], ops.lerp(ct, xy, self.rrtr[xx]))
+            r = ops.logistical(rr)
 
             ww = ops.add(k, self.time_first[xx])
-            p = ops.maximum(statee, ww)
+            rz = []
+            for i in range(len(x)):
+                p = ops.maximum(statee, ww[i])
 
-            e1 = ops.exp(ops.subtract(statee, p))
-            e2 = ops.exp(ops.subtract(ww, p))
-            a = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v))
-            b = ops.add(ops.multiply(e1, statec), e2)
-            ww = ops.add(statee, self.time_decay[xx])
+                e1 = ops.exp(ops.subtract(statee, p))
+                e2 = ops.exp(ops.subtract(ww[i], p))
+                a = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v[i]))
+                b = ops.add(ops.multiply(e1, statec), e2)
+                wwn = ops.add(statee, self.time_decay[xx])
 
-            p = ops.maximum(ww, k)
+                p = ops.maximum(wwn, k[i])
 
-            e1 = ops.exp(ops.subtract(ww, p))
-            e2 = ops.exp(ops.subtract(k, p))
-            outb = ops.add(ops.multiply(e1, stateb), ops.multiply(e2, v))
-            outc = ops.add(ops.multiply(e1, statec), e2)
-            eee = p
-            wkv = ops.divide(a, b)
+                e1 = ops.exp(ops.subtract(wwn, p))
+                e2 = ops.exp(ops.subtract(k[i], p))
+                outb = ops.add(ops.multiply(e1, stateb),
+                               ops.multiply(e2, v[i]))
+                outc = ops.add(ops.multiply(e1, statec), e2)
+                eee = p
+                wkv = ops.divide(a, b)
+                rz.append(wkv)
+                statee = eee
+                stateb = outb
+                statec = outc
 
             mvv = ops.add(x, ops.matvec(
-                self.outputvv[xx], ops.multiply(r, wkv)))
+                self.outputvv[xx], ops.multiply(r, ops.stack(rz))))
 
-            ddd = ops.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
+            ddd = ops.stack(
+                [ops.layernorm(y, self.ln2w[xx], self.ln2b[xx]) for y in mvv]
+            )
+
+            ctt = ops.cat([stated.unsqueeze(0), ddd[1:]])
 
             km = ops.relu(ops.matvec(self.key_ffn[xx], ops.lerp(
-                stated, ddd, self.time_mix_k_ffn[xx])))
+                ctt, ddd, self.time_mix_k_ffn[xx])))
 
             rt = ops.logistical((ops.matvec(self.receptance_ffn[xx], ops.lerp(
-                stated, ddd, self.time_mix_r_ffn[xx]))))
+                ctt, ddd, self.time_mix_r_ffn[xx]))))
 
             x = ops.add(mvv, ops.multiply(
                 ops.matvec(self.value_ffn[xx], ops.multiply(km, km)), rt))
 
-            return x, xy, outb, outc, ddd, eee
+            return x, xy[-1], outb, outc, ddd[-1], eee
 
         @ ops.mainfunc
         def forward(self, x: ops.VectorType, state: ops.MatrixType = None):
@@ -108,9 +121,9 @@ def LegacyRWKV(ops: module, *args):
             if (state is None):
                 state = ops.emptyState
 
-            x = ops.layernorm(
-                ops.processEmbed(ops.getIndex(self.emb, x)),
-                self.emb1, self.emb2)
+            x = ops.stack([ops.layernorm(
+                ops.processEmbed(z),
+                self.emb1, self.emb2) for z in ops.getIndex(self.emb, x)])
 
             statea = state[0::5]
             stateb = state[1::5]
@@ -128,7 +141,7 @@ def LegacyRWKV(ops: module, *args):
             x = ops.matvec(self.postprocess2, ops.layernorm(x, self.postprocess0,
                                                             self.postprocess1))
 
-            return ops.postProcessTensor(x), ops.stack(ot)
+            return ops.postProcessTensor(x[-1]), ops.stack(ot)
 
         # for keras stuff, ignore this if you are not using keras
         def call(self, *args, **kwds):

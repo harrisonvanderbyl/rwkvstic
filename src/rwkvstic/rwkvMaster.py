@@ -8,14 +8,8 @@ from typing import List
 
 def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
 
-    with torch.jit.optimized_execution(True):
-        for i in tqdm.tqdm(range(len(newctx))):
+    o = model.forward(newctx, statex)
 
-            x = ctx+newctx[:i]
-
-            o = model.forward([x[-1]], statex)
-            statex = o[1]
-            progressCallBack(x)
     return ctx+newctx, o[1]
 
 

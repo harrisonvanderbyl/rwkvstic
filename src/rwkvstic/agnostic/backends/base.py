@@ -45,9 +45,9 @@ class module:
         self.minimum = raiseNotImplemented
         self.klimit = raiseNotImplemented
         # tensorflow function defs
-        self.initfunc = raiseNotImplemented
-        self.layerdef = raiseNotImplemented
-        self.mainfunc = raiseNotImplemented
+        self.initfunc = lambda x: x
+        self.layerdef = lambda x: x
+        self.mainfunc = lambda x: x
         import numpy as np
         self.emptyState: self.MatrixType = np.array((([[0.00]*embed, [0.00]*embed, [0.00]*embed, [
             0.00]*embed]+([[-1e30]*embed] if self.useLogFix else [])))*layers)
@@ -69,4 +69,4 @@ class module:
 
         self.stackEmb = False
 
-        self.getIndex = lambda x, y: x[y[-1]]
+        self.getIndex = lambda x, y: x[y]
