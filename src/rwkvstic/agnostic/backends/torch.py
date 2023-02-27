@@ -1,4 +1,5 @@
 
+from typing import List, Union
 import rwkvstic.agnostic.backends.base as RWKVOp
 
 
@@ -56,6 +57,22 @@ class RWKVPTOps(RWKVOp.module):
 
         self.exp = torch.exp
         self.lerp = torch.lerp
+        def rng(x: int): return torch.range(0, x-1).to(dtype=torch.int64)
+        self.rng = rng
+
+        def emptyarray(x: int): return [torch.ones(0)]*x
+        self.emptyarray = emptyarray
+
+        def arrayPush(x: List[torch.Tensor], y, i: int):
+            x[i] = y
+            return x
+        self.arrayPush = arrayPush
+
+        def arrayGet(x: List[torch.Tensor], i: int): return x[i]
+        self.arrayGet = arrayGet
+
+        def pop(x): return x[-1]
+        self.pop = pop
 
         # module def
         self.module = torch.nn.Module

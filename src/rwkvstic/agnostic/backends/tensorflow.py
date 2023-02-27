@@ -22,6 +22,7 @@ class RWKVTFOps(RWKVOp.module):
         super(RWKVTFOps, self).__init__(layers, embed, *args, **kwargs)
         self.initTensor = lambda x: tf.convert_to_tensor(
             x.float().cpu().numpy())
+
         self.sqrt = tf.sqrt
         self.mean = tf.reduce_mean
         self.relu = lambda x: tf.maximum(x, tf.zeros_like(x))
@@ -29,13 +30,44 @@ class RWKVTFOps(RWKVOp.module):
         self.maximum = tf.maximum
         self.exp = tf.exp
         self.unsqueeze = tf.expand_dims
-        self.stack = tf.stack
+
         self.cat = lambda x: tf.concat(x, axis=0)
-        self.matvec = lambda x, y: tf.matmul(x, y, transpose_b=True)
+
+        def matvec(x, y):
+            y = tf.transpose(y)
+            return tf.transpose(tf.matmul(x, y))
+        self.matvec = matvec
         self.prod = lambda x: tf.reduce_prod(x, axis=1)
-        self.klimit = tf.convert_to_tensor(
-            [30]*embed, dtype=tf.float32
-        )
+
+        def roll(x):
+            zx = x
+            rx = tf.concat([zx[:1], zx[0:-1]], axis=0)
+            return rx
+        self.rng = lambda x: tf.range(x, dtype=tf.int32)
+
+        def emptyarray(x): return tf.TensorArray(tf.float32, size=x, element_shape=(
+            tf.TensorShape([embed])
+        ))
+        self.emptyarray = emptyarray
+        def arrayPush(x, y, i): return x.write(i, y)
+        self.arrayPush = arrayPush
+        def arrayGet(x, i): return x.read(i)
+        self.arrayGet = arrayGet
+
+        def stack(x):
+            return tf.stack(x) if type(x) == list else x.stack()
+        self.stack = stack
+        self.roll = roll
+        def pop(x): return x[-1]
+        self.pop = pop
+
+        def push(x, y):
+            # x[0] = y
+            # tensorflow does not support item assignment
+            # so we have to do this
+            return tf.concat([tf.expand_dims(y, 0), x[1:]], axis=0)
+
+        self.push = push
         self.log = tf.math.log
         self.lerp = lambda x, y, z: x*(1-z)+y*z
        # module def
@@ -46,17 +78,21 @@ class RWKVTFOps(RWKVOp.module):
        # tensorflow function defs
         self.initfunc = lambda x: x
         self.layerdef = tf.function(
-            input_signature=[tf.TensorSpec(shape=[None, None], dtype=tf.float32)]+(4+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int64, shape=None)])
+            input_signature=[tf.TensorSpec(shape=[None, None], dtype=tf.float32)]+(4+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int32, shape=None)])
 
-        self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[None], dtype=tf.int32), tf.TensorSpec(
+        self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[None], dtype=tf.int64), tf.TensorSpec(
             shape=[(4+self.useLogFix)*layers, embed], dtype=tf.float32)])
         self.emptyState = tf.convert_to_tensor(
             self.emptyState, dtype=tf.float32)
 
         def ln(x, w, b):
             # layernorm batchnorm
-            return tf.nn.batch_normalization(x, tf.reduce_mean(x, axis=1, keepdims=True), tf.math.reduce_std(
-                x, axis=1, keepdims=True), b, w, 1e-5)
+            xee2 = x - tf.reduce_mean(x, 1, True)
+
+            x2 = tf.sqrt(tf.reduce_mean(xee2*xee2, 1, True) +
+                         1e-5)
+            o = w*(xee2/x2) + b
+            return o
 
         self.layernorm = ln
 

@@ -69,14 +69,29 @@ class module:
         self.postProcessModule = lambda x: x
 
         self.sample = npsample
+        def emptyarray(x: int): return [0]*x
+        self.emptyarray = emptyarray
+        def arrayPush(x: list, y, i: int): return [*x[0:i], y, *x[i+1:]]
+        self.arrayPush = arrayPush
+        def rng(x: int): return range(x)
+        self.rng = rng
+        def pop(x): return x[-1]
+        self.pop = pop
+        def arrayGet(x, i: int): return x[i]
+        self.arrayGet = arrayGet
 
-        self.roll = raiseNotImplemented
+        def push(x, y):
+            x[0] = y
+            return x
+        self.push = push
+
+        self.roll = lambda x: [*x[0:1], *x[0:-1]]
         # typing, set as any
 
         self.tensorDef = None
 
-        def len(x): return len(x)
-        self.len = len
+        def lenn(x): return len(x)
+        self.len = lenn
 
         self.stackEmb = False
 
