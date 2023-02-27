@@ -40,6 +40,8 @@ class RWKVNumpyOps(RWKVOp.module):
 
             return w*(xee2/x2) + b
         self.layernorm = ln
+        self.mainarray = self.emptyarray
+        self.pushstate = self.arrayPush
 
 
 class RWKVJaxOps(RWKVOp.module):

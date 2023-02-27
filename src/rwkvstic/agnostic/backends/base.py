@@ -97,3 +97,8 @@ class module:
 
         def getIndex(x, y): return x[y]
         self.getIndex = getIndex
+
+        self.zero = 0
+        self.one = 1
+        self.mainarray = self.emptyarray
+        self.pushstate = self.arrayPush

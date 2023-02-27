@@ -35,8 +35,9 @@ class RWKVPTOps(RWKVOp.module):
         self.minimum = torch.minimum
         self.unsqueeze = torch.unsqueeze
         self.expand = lambda x, y: x.expand(*y)
-        self.range = torch.arange
         self.pow = torch.pow
+        self.add = torch.add
+        self.one = torch.tensor(1, dtype=torch.int64)
         self.sqrt = torch.sqrt
         self.mean = torch.mean
         self.relu = torch.relu
@@ -57,7 +58,7 @@ class RWKVPTOps(RWKVOp.module):
 
         self.exp = torch.exp
         self.lerp = torch.lerp
-        def rng(x: int): return torch.range(0, x-1).to(dtype=torch.int64)
+        def rng(x: int): return torch.arange(x).to(dtype=torch.int64)
         self.rng = rng
 
         def emptyarray(x: int): return [torch.ones(0)]*x
@@ -68,8 +69,14 @@ class RWKVPTOps(RWKVOp.module):
             return x
         self.arrayPush = arrayPush
 
+        self.mainarray = self.emptyarray
+        self.pushstate = self.arrayPush
+
         def arrayGet(x: List[torch.Tensor], i: int): return x[i]
         self.arrayGet = arrayGet
+
+        def lenn(x): return x.shape[0]
+        self.len = lenn
 
         def pop(x): return x[-1]
         self.pop = pop

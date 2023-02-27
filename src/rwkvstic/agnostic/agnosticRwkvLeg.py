@@ -1,6 +1,7 @@
 from rwkvstic.agnostic.backends.base import module
-from typing import Dict
+from typing import Dict, List
 import tensorflow as tf
+import torch
 
 
 def LegacyRWKV(ops: module, *args):
@@ -56,6 +57,45 @@ def LegacyRWKV(ops: module, *args):
             self.value_ffn: ops.MatrixType = ops.stack([
                 w[f"blocks.{x}.ffn.value.weight"] for x in range(ops.n_layers)])
 
+        def doGPT(self, ww, xx: int, k, v, i: int, bz: List[torch.Tensor], cz: List[torch.Tensor], gz: List[torch.Tensor], rz: List[torch.Tensor]):
+            p = self.maximum(self.arrayGet(bz, i), ww[i])
+
+            e1 = self.exp(self.subtract(self.arrayGet(bz, i), p))
+
+            e2 = self.exp(self.subtract(ww[i], p))
+
+            a = self.add(self.multiply(e1, self.arrayGet(cz, i)),
+                         self.multiply(e2, v[i]))
+
+            b = self.add(self.multiply(e1, self.arrayGet(gz, i)), e2)
+
+            wwn = self.add(self.arrayGet(bz, i), self.time_decay[xx])
+
+            p1 = self.maximum(wwn, k[i])
+
+            e11 = self.exp(self.subtract(wwn, p1))
+
+            e21 = self.exp(self.subtract(k[i], p1))
+
+            outb = self.add(self.multiply(e11, self.arrayGet(cz, i)),
+                            self.multiply(e21, v[i]))
+
+            outc = self.add(self.multiply(e11, self.arrayGet(gz, i)), e21)
+
+            wkv = self.divide(a, b)
+            rz = self.arrayPush(rz, wkv, i)
+            bz = self.arrayPush(bz, p1, i+1)
+            cz = self.arrayPush(cz, outb, i+1)
+
+            gz = self.arrayPush(gz, outc, i+1)
+
+            return bz, cz, gz, rz
+
+        def loop(self, x: int, ww, xx: int, k, v, bz: List[torch.Tensor], cz: List[torch.Tensor], gz: List[torch.Tensor], rz: List[torch.Tensor]):
+            for i in self.rng(x):
+                bz, cz, gz, rz = self.doGPT(ww, xx, k, v, i, bz, cz, gz, rz)
+            return bz, cz, gz, rz
+
         @ops.layerdef
         def doLayer(self, x, statea, stateb, statec, stated, statee, xx: int):
 
@@ -76,45 +116,15 @@ def LegacyRWKV(ops: module, *args):
 
             ww = self.add(k, self.time_first[xx])
             rz = self.emptyarray(self.len(x))
-            bz = self.emptyarray(self.len(x)+1)
-            cz = self.emptyarray(self.len(x)+1)
-            gz = self.emptyarray(self.len(x)+1)
-            bz = self.arrayPush(bz, statee, 0)
-            cz = self.arrayPush(cz, stateb, 0)
-            gz = self.arrayPush(gz, statec, 0)
+            bz = self.emptyarray(self.add(self.len(x), self.one))
+            cz = self.emptyarray(self.add(self.len(x), self.one))
+            gz = self.emptyarray(self.add(self.len(x), self.one))
+            bz = self.arrayPush(bz, statee, self.zero)
+            cz = self.arrayPush(cz, stateb, self.zero)
+            gz = self.arrayPush(gz, statec, self.zero)
 
-            for i in self.rng(self.len(x)):
-
-                p = self.maximum(self.arrayGet(bz, i), ww[i])
-
-                e1 = self.exp(self.subtract(self.arrayGet(bz, i), p))
-
-                e2 = self.exp(self.subtract(ww[i], p))
-
-                a = self.add(self.multiply(e1, self.arrayGet(cz, i)),
-                             self.multiply(e2, v[i]))
-
-                b = self.add(self.multiply(e1, self.arrayGet(gz, i)), e2)
-
-                wwn = self.add(self.arrayGet(bz, i), self.time_decay[xx])
-
-                p1 = self.maximum(wwn, k[i])
-
-                e11 = self.exp(self.subtract(wwn, p1))
-
-                e21 = self.exp(self.subtract(k[i], p1))
-
-                outb = self.add(self.multiply(e11, self.arrayGet(cz, i)),
-                                self.multiply(e21, v[i]))
-
-                outc = self.add(self.multiply(e11, self.arrayGet(gz, i)), e21)
-
-                wkv = self.divide(a, b)
-                rz = self.arrayPush(rz, wkv, i)
-                bz = self.arrayPush(bz, p1, i+1)
-                cz = self.arrayPush(cz, outb, i+1)
-
-                gz = self.arrayPush(gz, outc, i+1)
+            bz, cz, gz, rz = self.loop(
+                self.len(x), ww, xx, k, v, bz, cz, gz, rz)
 
             mvv = self.add(x, self.matvec(
                 self.outputvv[xx], self.multiply(r, self.stack(rz))))
@@ -149,18 +159,18 @@ def LegacyRWKV(ops: module, *args):
             stated = state[3::5]
             statee = state[4::5]
 
-            ot = self.emptyarray(self.n_layers*5)
+            ot = self.mainarray(self.n_layers*5)
 
             for i in self.rng(self.n_layers):
 
                 x, aaa, bbb, ccc, ddd, eee = self.doLayer(
                     x, statea[i], stateb[i], statec[i], stated[i], statee[i], i)
 
-                ot = self.arrayPush(ot, aaa, i*5)
-                ot = self.arrayPush(ot, bbb, i*5+1)
-                ot = self.arrayPush(ot, ccc, i*5+2)
-                ot = self.arrayPush(ot, ddd, i*5+3)
-                ot = self.arrayPush(ot, eee, i*5+4)
+                ot = self.pushstate(ot, aaa, i*5)
+                ot = self.pushstate(ot, bbb, i*5+1)
+                ot = self.pushstate(ot, ccc, i*5+2)
+                ot = self.pushstate(ot, ddd, i*5+3)
+                ot = self.pushstate(ot, eee, i*5+4)
 
             x = self.matvec(self.postprocess2, self.layernorm(x, self.postprocess0,
                                                               self.postprocess1))

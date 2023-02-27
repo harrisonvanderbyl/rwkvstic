@@ -14,11 +14,11 @@ Backends: Dict[str, module] = {
     "pytorch-deepspeed(gpu)": RWKVCudaDeepspeedOps,
     "pytorch-quant(gpu-8bit)": RWKVCudaQuantOps,
     "pytorch-stream(gpu-config-vram)": RWKVStreamBigOps,
-    "pytorch-split(2xgpu)": RWKVSplitCudaOps,
+    # "pytorch-split(2xgpu)": RWKVSplitCudaOps,
     "export-torchscript": RWKVPTTSExportOps,
-    "export-tensorflow": RWKVTFExport,
+    # "export-tensorflow": RWKVTFExport,
     "onnx_export": RWKVOnnxOps,
-    "coreml": RWKVCoreMLOps
+    # "coreml": RWKVCoreMLOps
 }
 
 
@@ -27,10 +27,10 @@ JAX = "jax(cpu/gpu/tpu)"
 TF = "tensorflow(cpu/gpu)"
 TORCH_DEEPSPEED = "pytorch-deepspeed(gpu)"
 TORCH_QUANT = "pytorch-quant(gpu-8bit)"
-TORCH_SPLIT = "pytorch-split(2xgpu)"
+# TORCH_SPLIT = "pytorch-split(2xgpu)"
 TORCH_EXPORT = "export-torchscript"
-TF_EXPORT = "export-tensorflow"
+# TF_EXPORT = "export-tensorflow"
 ONNX_EXPORT = "onnx_export"
 NUMPY = "numpy(cpu)"
 
-COREML = "coreml"
+# COREML = "coreml"

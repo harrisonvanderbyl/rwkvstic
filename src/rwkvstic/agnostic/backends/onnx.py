@@ -41,11 +41,13 @@ class RWKVOnnxOps(RWKVOp.module):
         self.TensorList = []
         self.NodeList = []
 
-        def initTensor(x):
+        def initTensor(x, dtype=dtype):
             name = f"PreTrainedTensor_{self.nm}"
             self.nm += 1
             if isinstance(x, list):
                 xx = np.array(x).astype(nptype)
+            elif isinstance(x, np.ndarray):
+                xx = x
             else:
                 xx = x.squeeze().float().cpu().numpy()
                 # convert to float32
@@ -90,7 +92,9 @@ class RWKVOnnxOps(RWKVOp.module):
             node = onnx.helper.make_node(
                 'ReduceMean',
                 inputs=[x],
-                outputs=[name]
+                outputs=[name],
+                axes=[1],
+                keepdims=1
             )
             self.NodeList.append(node)
 
@@ -131,17 +135,31 @@ class RWKVOnnxOps(RWKVOp.module):
 
         self.stack = stack
 
+        def transpose(x):
+            name = f"transpose_{self.nm}_out"
+            self.nm += 1
+            node = onnx.helper.make_node(
+                'Transpose',
+                inputs=[x],
+                outputs=[name],
+                perm=[1, 0]
+            )
+            self.NodeList.append(node)
+
+            return name
+
         def matvec(x, y):
             name = f"matvec_{self.nm}_out"
             oname = f"matvec_g_{self.nm}_out"
             self.nm += 1
             node = onnx.helper.make_node(
                 'MatMul',
-                inputs=[x, y],
-                outputs=[name]
+                inputs=[x, transpose(y)],
+                outputs=[name],
+
             )
             self.NodeList.append(node)
-            return name
+            return transpose(name)
 
         self.matvec = matvec
 
@@ -274,16 +292,19 @@ class RWKVOnnxOps(RWKVOp.module):
         self.divide = divide
 
         def layernorm(x, w, b):
-            name = f"layernorm_{self.nm}_out"
-            self.nm += 1
-            node = onnx.helper.make_node(
-                'LayerNormalization',
-                inputs=[x, w, b],
-                outputs=[name]
-            )
-            self.NodeList.append(node)
 
-            return name
+            # layernorm batchnorm
+            xee2 = self.subtract(x, self.mean(x))
+
+            x2 = self.sqrt(self.mean(self.multiply(
+                xee2, xee2)))
+            o = self. add(
+                self.multiply(w,
+                              self.divide(xee2, x2)), b)
+
+            return o
+            # nan on cuda
+            # return torch.nn.functional.layer_norm(x, x.shape, w.expand(x.shape), b.expand(x.shape))
 
         self.layernorm = layernorm
 
@@ -297,9 +318,23 @@ class RWKVOnnxOps(RWKVOp.module):
             )
             self.NodeList.append(node)
 
-            return squeeze(name)
+            return name
 
         self.stackEmbed = False
+
+        def pop(x):
+            name = f"pop_{self.nm}_out"
+            self.nm += 1
+            node = onnx.helper.make_node(
+                'Gather',
+                inputs=[x, self.subtract(self.len(x), self.one)],
+                outputs=[name]
+            )
+            self.NodeList.append(node)
+
+            return name
+
+        self.pop = pop
 
         def neg(x):
             name = f"neg_{self.nm}_out"
@@ -344,15 +379,107 @@ class RWKVOnnxOps(RWKVOp.module):
 
         self.getIndex = getIndex
 
+        self.zero = initTensor(
+            np.zeros([1], dtype=np.int64), dtype=onnx.TensorProto.INT64)
+        self.one = initTensor(
+            np.ones([1], dtype=np.int64), dtype=onnx.TensorProto.INT64)
+
         # convert to float32
         self.emptyState = np.array(self.emptyState, dtype=nptype)
 
+        def lenn(x):
+            name = f"lenn_{self.nm}_out"
+            self.nm += 1
+            node = onnx.helper.make_node(
+                'Shape',
+                inputs=[x],
+                outputs=[name]
+            )
+            self.NodeList.append(node)
+
+            return name
+
+        self.len = lenn
+
+        def roll(x):
+            name = f"roll_{self.nm}_out"
+            self.nm += 1
+            node = onnx.helper.make_node(
+                'Roll',
+                inputs=[x, self.one],
+                outputs=[name],
+                axis=0
+            )
+            self.NodeList.append(node)
+
+            return name
+
+        self.roll = roll
+
+        def push(x, y, z):
+            # set index 0 to y
+            name = f"push_{self.nm}_out"
+            self.nm += 1
+            node = onnx.helper.make_node(
+                'Scatter',
+                inputs=[x, z, y],
+                outputs=[name]
+            )
+            self.NodeList.append(node)
+
+            return name
+
+        self.arrayPush = push
+
+        def Push(x, y):
+            return self.arrayPush(x, y, self.zero)
+
+        self.push = Push
         # self.zero = initTensor([0.0]*embed)
+        emb = initTensor([[0.0]*embed])
+
+        def emptyTensor(x):
+            name = f"emptyTensor_{self.nm}_out"
+            self.nm += 1
+            node = onnx.helper.make_node(
+                "Expand",
+                inputs=[emb],
+                outputs=[name],
+                shape=[x]
+            )
+
+            self.NodeList.append(node)
+
+            return name
+
+        self.emptyarray = emptyTensor
+
+        self.arrayGet = getIndex
+
+        def emptyTensor(x):
+            return []
+        self.mainarray = emptyTensor
+        self.pushstate = lambda x, y, z: x + [y]
+
+        def loop(x: int, ww, xx: int, k, v, bz, cz, gz, rz):
+            print("loop")
+            print(x)
+            print(ww)
+            print(xx)
+            print(k)
+            print(v)
+            print(bz)
+            print(cz)
+            print(gz)
+            print(rz)
+            return bz, cz, gz, rz
+
+        self.loop = loop
 
         def ppm(x):
             inputtensor = onnx.helper.make_tensor_value_info("input0",
                                                              onnx.TensorProto.INT32,
-                                                             [1]), "input0"
+                                                             [None]), "input0"
 
             emptyState = list(map(lambda x: (onnx.helper.make_tensor_value_info("instate"+str(x),
                                                                                 dtype,

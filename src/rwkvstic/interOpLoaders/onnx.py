@@ -45,11 +45,13 @@ def initONNXFile(path, tokenizer=None):
             input_names = [x.name for x in input_names]
             # get output names
             output_names = sess.get_outputs()
+            print(output_names)
             output_names = [x.name for x in output_names]
             # print(output_names)
 
             # create input dict
-            inputs[input_names[0]] = np.array([xi[-1]], dtype=np.int32)
+            print(xi)
+            inputs[input_names[0]] = np.array(xi, dtype=np.int32)
             for i in range(len(input_names)-1):
                 inputs[input_names[i+1]] = statei[i]
 

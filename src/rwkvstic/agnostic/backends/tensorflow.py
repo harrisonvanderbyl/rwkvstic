@@ -98,6 +98,8 @@ class RWKVTFOps(RWKVOp.module):
 
         self.len = lambda x: tf.shape(x)[0]
         self.getIndex = lambda x, y: tf.gather(x, y, axis=0)
+        self.mainarray = self.emptyarray
+        self.pushstate = self.arrayPush
 
 
 class RWKVTFExport(RWKVTFOps):
