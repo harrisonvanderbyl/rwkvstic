@@ -100,10 +100,60 @@ class RWKVTFOps(RWKVOp.module):
         self.getIndex = lambda x, y: tf.gather(x, y, axis=0)
 
 
-class RWKVTFExport(RWKVTFOps):
-    def __init__(self, layers, embed, *args,  exports=None, **kwargs):
+class RWKVTFExport(RWKVOp.rnnmodule):
+
+    def __init__(self, layers, embed, *args, useGPU: bool = None, exports=None, **kwargs):
+        try:
+            import tensorflow as tf
+        except:
+            inst = inquirer.confirm(
+                "Tensorflow not installed, do you want to install it?")
+            if inst:
+                os.system("pip3 install tensorflow")
+                import tensorflow as tf
+        if (not (inquirer.confirm("Do you want to use GPU?") if useGPU is None else useGPU)):
+            tf.config.experimental.set_visible_devices([], "GPU")
+        tf.config.optimizer.set_jit(True)
+        tf.config.optimizer.set_experimental_options(
+            {"auto_mixed_precision": True})
+
         super(RWKVTFExport, self).__init__(layers, embed, *args, **kwargs)
-        import tensorflow as tf
+        self.initTensor = lambda x: tf.convert_to_tensor(
+            x.float().cpu().numpy())
+        self.sqrt = tf.sqrt
+        self.mean = tf.reduce_mean
+        self.relu = lambda x: tf.maximum(x, tf.zeros_like(x))
+        self.minimum = tf.minimum
+        self.maximum = tf.maximum
+        self.exp = tf.exp
+        self.stack = tf.stack
+        self.matvec = tf.linalg.matvec
+        self.prod = lambda x: tf.reduce_prod(x, axis=1)
+        self.klimit = tf.convert_to_tensor(
+            [30]*embed, dtype=tf.float32
+        )
+        self.log = tf.math.log
+        self.lerp = lambda x, y, z: x*(1-z)+y*z
+       # module def
+        self.module = tf.Module
+        # class def
+       # tensorflow function defs
+        self.initfunc = lambda x: x
+        self.layerdef = tf.function(
+            input_signature=(5+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int64, shape=None)])
+        self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[1], dtype=tf.int32), tf.TensorSpec(
+            shape=[(4+self.useLogFix)*layers, embed], dtype=tf.float32)])
+        self.emptyState = tf.convert_to_tensor(
+            self.emptyState, dtype=tf.float32)
+
+        def ln(x, w, b):
+            xee2 = x - self.mean(x)
+
+            x2 = self.sqrt(self.mean(xee2*xee2) + 0.000009999999747378752)
+
+            return w*(xee2/x2) + b
+
+        self.layernorm = ln
         self.module = tf.keras.Model
         path = f"tfdist/rwkv-{layers}-{embed}/"
 

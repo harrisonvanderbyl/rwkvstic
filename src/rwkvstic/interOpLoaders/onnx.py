@@ -36,6 +36,9 @@ def initONNXFile(path, tokenizer=None):
         typenum = np.bfloat16
 
     class InterOp():
+
+        RnnOnly = not True
+
         def forward(selff, xi, statei):
             # print(statei[0][23])
             # create inputs

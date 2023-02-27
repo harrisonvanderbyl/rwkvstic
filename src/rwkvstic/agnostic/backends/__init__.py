@@ -18,7 +18,7 @@ Backends: Dict[str, module] = {
     "export-torchscript": RWKVPTTSExportOps,
     "export-tensorflow": RWKVTFExport,
     "onnx_export": RWKVOnnxOps,
-    "coreml": RWKVCoreMLOps
+    # "coreml": RWKVCoreMLOps
 }
 
 
@@ -33,4 +33,4 @@ TF_EXPORT = "export-tensorflow"
 ONNX_EXPORT = "onnx_export"
 NUMPY = "numpy(cpu)"
 
-COREML = "coreml"
+# COREML = "coreml"

@@ -15,6 +15,19 @@ def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
     return newctx, o[1]
 
 
+def rnnloadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
+
+    with torch.jit.optimized_execution(True):
+        for i in tqdm.tqdm(range(len(newctx))):
+
+            x = ctx+newctx[:i]
+
+            o = model.forward([x[-1]], statex)
+            statex = o[1]
+            progressCallBack(x)
+    return ctx+newctx, o[1]
+
+
 class RWKVMaster():
     def __init__(self, model, emptyState, initTensor=lambda x: x, intTensor=lambda x: x, sampler=None, tokPath=None):
         self.model = model
@@ -61,8 +74,12 @@ class RWKVMaster():
         statex = self.myState if statex is None else statex
         ctx = self.tokenizer.encode(ctx)
         newctx = self.tokenizer.encode(newctx)
-        ctx, state = loadContext(
-            self.model, ctx, self.intTensor(newctx), statex, progressCallBack)
+        if self.model.RnnOnly:
+            ctx, state = rnnloadContext(
+                self.model, ctx, self.intTensor(newctx), statex, progressCallBack)
+        else:
+            ctx, state = loadContext(
+                self.model, ctx, self.intTensor(newctx), statex, progressCallBack)
         self.lastToken = ctx[-1]
         self.myState = state
         return ctx, state

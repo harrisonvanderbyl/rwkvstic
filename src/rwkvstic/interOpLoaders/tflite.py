@@ -19,6 +19,8 @@ def initTFLiteFile(path, tokenizer=None):
     dtype = input_details[1]['dtype']
 
     class InterOp():
+        RnnOnly = True
+
         def forward(self, x, y):
 
             interpreter.set_tensor(

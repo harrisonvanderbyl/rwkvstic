@@ -12,6 +12,8 @@ def initTorchScriptFile(path, tokenizer=None):
     print("input shape", dtype)
 
     class InterOp():
+        RnnOnly = not True
+
         def forward(self, x, y):
 
             mm, nn = mymodel(torch.LongTensor(x), y)
