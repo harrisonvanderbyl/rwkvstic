@@ -30,7 +30,7 @@ class module:
         def divide(x, y): return x/y
         def multiply(x, y): return x*y
         def subtract(x, y): return x-y
-        self.intTensor = lambda x: x
+        self.intTensor = lambda x: [x] if type(x) == int else x
         self.add = add
         self.divide = divide
         self.multiply = multiply
@@ -52,6 +52,7 @@ class module:
         self.klimit = raiseNotImplemented
         # tensorflow function defs
         self.initfunc = lambda x: x
+
         self.layerdef = lambda x: x
 
         self.mainfunc = lambda x: x
@@ -126,6 +127,7 @@ class rnnmodule:
         self.exp = raiseNotImplemented
         self.maximum = raiseNotImplemented
         self.add = lambda x, y: x+y
+
         self.divide = lambda x, y: x/y
         self.multiply = lambda x, y: x*y
         self.subtract = lambda x, y: x-y

@@ -37,4 +37,5 @@ def initTFLiteFile(path, tokenizer=None):
         [[0.01]*int(embed)]*int(layers), dtype=dtype)
 
     def initTensor(x): return tf.convert_to_tensor(x, dtype=dtype)
-    return RWKVMaster(model, emptyState, initTensor, npsample, tokenizer)
+    def intTensor(x): return [x] if type(x) == int else x
+    return RWKVMaster(model, emptyState, initTensor, intTensor, npsample, tokenizer)

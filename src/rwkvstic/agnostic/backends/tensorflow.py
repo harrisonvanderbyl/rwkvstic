@@ -31,6 +31,9 @@ class RWKVTFOps(RWKVOp.module):
         self.exp = tf.exp
         self.unsqueeze = tf.expand_dims
 
+        def intTensor(x): return tf.convert_to_tensor(
+            x if type(x) == list else [x], dtype=tf.int64) if type(x) != tf.Tensor else x
+        self.intTensor = intTensor
         self.cat = lambda x: tf.concat(x, axis=0)
 
         def matvec(x, y):

@@ -26,5 +26,5 @@ def initTorchScriptFile(path, tokenizer=None):
     def initTensor(x): return torch.tensor(x, dtype=dtype, device=device)
 
     useSampler = "sampler" not in path
-
-    return RWKVMaster(model, emptyState, initTensor, torch.LongTensor, npsample if useSampler else None, tokenizer)
+    def intTensor(x): return [x] if type(x) == int else x
+    return RWKVMaster(model, emptyState, initTensor, intTensor, npsample if useSampler else None, tokenizer)

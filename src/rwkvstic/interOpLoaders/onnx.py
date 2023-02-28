@@ -37,7 +37,7 @@ def initONNXFile(path, tokenizer=None):
 
     class InterOp():
 
-        RnnOnly = not True
+        RnnOnly = True
 
         def forward(selff, xi, statei):
             # print(statei[0][23])
@@ -67,4 +67,5 @@ def initONNXFile(path, tokenizer=None):
         np.array([0.01]*int(embed)).astype(typenum)]*len(sess.get_inputs()[1:])
 
     def initTensor(x): return np.array(x, dtype=typenum)
-    return RWKVMaster(model, emptyState, initTensor, npsample, tokenizer)
+    def intTensor(x): return [x] if type(x) == int else x
+    return RWKVMaster(model, emptyState, initTensor, intTensor, npsample, tokenizer)

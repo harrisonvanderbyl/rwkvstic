@@ -36,7 +36,7 @@ class RWKVMaster():
 
         self.emptyState = emptyState
         self.myState = emptyState
-        self.lastToken = 187
+        self.lastToken = [187]
         self.initTensor = initTensor
         self.intTensor = intTensor
         self.sampler = sampler
@@ -46,7 +46,7 @@ class RWKVMaster():
         tolens = []
         for i in range(number):
             logits, ostate = self.model.forward(
-                self.intTensor([self.lastToken]), ostate)
+                self.intTensor(self.lastToken), ostate)
             try:
                 logits[0] += (end_adj)
             except:
@@ -55,11 +55,11 @@ class RWKVMaster():
             sampled = self.sample(
                 logits, temp, top_p_usual) if self.sampler is not None else logits
             try:
-                self.lastToken = sampled.cpu().numpy()[0]
+                self.lastToken = [sampled.cpu().numpy()[0]]
             except:
-                self.lastToken = sampled
+                self.lastToken = [sampled]
 
-            tolens += [self.lastToken]
+            tolens += [self.lastToken[0]]
             sampled = self.tokenizer.decode(tolens)
             progressLambda(
                 {"logits": logits, "state": ostate, "output": sampled, "progress": i, "tokens": tolens, "total": number, "current": self.tokenizer.decode([tolens[-1]])})
@@ -72,6 +72,7 @@ class RWKVMaster():
 
     def loadContext(self, newctx: str = "", ctx: str = "\n\n", statex=None, progressCallBack=lambda x: x):
         statex = self.myState if statex is None else statex
+        print(newctx)
         ctx = self.tokenizer.encode(ctx)
         newctx = self.tokenizer.encode(newctx)
         if self.model.RnnOnly:
