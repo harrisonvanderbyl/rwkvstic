@@ -9,18 +9,19 @@ import time
 
 def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
     tt = time.time()
+    nnewctx = newctx
     btch = 20
     o = (None, statex)
 
-    while len(ctx) > 0:
-        m = ctx[:btch]
-        ctx = ctx[btch:]
+    while len(newctx) > 0:
+        m = newctx[:btch]
+        newctx = newctx[btch:]
         o = model.forward(m, o[1])
         progressCallBack(m)
 
     print("loaded context in", time.time()-tt, "seconds")
     print(o[0][0])
-    return newctx, o[1]
+    return nnewctx, o[1]
 
 
 def rnnloadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
