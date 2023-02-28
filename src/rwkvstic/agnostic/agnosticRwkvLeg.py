@@ -1,6 +1,5 @@
 from rwkvstic.agnostic.backends.base import module
 from typing import Dict
-import tensorflow as tf
 
 
 def LegacyRWKV(ops: module, *args):
