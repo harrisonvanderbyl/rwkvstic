@@ -19,6 +19,8 @@ def initTFLiteFile(path, tokenizer=None):
     dtype = input_details[1]['dtype']
 
     class InterOp():
+        RnnOnly = True
+
         def forward(self, x, y):
 
             interpreter.set_tensor(
@@ -35,4 +37,5 @@ def initTFLiteFile(path, tokenizer=None):
         [[0.01]*int(embed)]*int(layers), dtype=dtype)
 
     def initTensor(x): return tf.convert_to_tensor(x, dtype=dtype)
-    return RWKVMaster(model, emptyState, initTensor, npsample, tokenizer)
+    def intTensor(x): return [x] if type(x) == int else x
+    return RWKVMaster(model, emptyState, initTensor, intTensor, npsample, tokenizer)

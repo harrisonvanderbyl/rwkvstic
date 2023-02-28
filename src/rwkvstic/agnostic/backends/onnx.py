@@ -3,7 +3,7 @@ import numpy as np
 import rwkvstic.agnostic.backends.base as RWKVOp
 
 
-class RWKVOnnxOps(RWKVOp.module):
+class RWKVOnnxOps(RWKVOp.rnnmodule):
 
     def __init__(self, layers, embed, *args, dtype=None, **kwargs):
         import onnx

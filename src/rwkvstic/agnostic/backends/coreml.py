@@ -1,46 +1,50 @@
-from rwkvstic.agnostic.backends.torch import RWKVPTOps
+from rwkvstic.agnostic.backends.base import module
 
 
-class RWKVCoreMLOps(RWKVPTOps):
-    def __init__(self, layers, embed, *args, includeSampler=None, **kwargs):
-        import torch
-        super().__init__(layers, embed, dtype=torch.float32, *args, **kwargs)
-        import torch
-        import inquirer
-        self.stack = lambda x: torch.stack(x)
+class RWKVCoreMLOps(module):
+    def __init__(self, layers, embed, *args, **kwargs):
 
-        includeSampler = includeSampler
+        super().__init__(layers, embed, *args, **kwargs)
+        from coremltools.converters.mil.mil import Builder as mb
+        from coremltools.converters.mil.mil import Program, Function
+        func_inputs = {"x": mb.placeholder(shape=[1]),
+                       **{f"state{i}": mb.placeholder(shape=[1]) for i in range(5*layers)},
+                       }
 
-        if includeSampler:
-            from rwkvstic.agnostic.samplers.torch import torchsample
-            self.sample = torchsample
-            self.postProcessTensor = lambda x: self.sample(
-                x.float().cpu(), torch.tensor(1), torch.tensor(0.9))
+        with Function(func_inputs) as ssa_fun:
 
-        def exportTorchScript(x):
-            traced_model = torch.jit.trace(
-                x, (torch.LongTensor([0]), self.emptyState), check_trace=False, strict=False)
-            self.emptyState = self.emptyState.float().cpu().numpy()
+            prog = Program()
 
-            import coremltools as ct
+            self.initTensor = lambda x: x.float().cpu().numpy()
+            self.sqrt = mb.sqrt
+            self.mean = mb.reduce_mean
+            self.relu = lambda x: mb.maximum(x, 0)
+            self.exp = mb.exp
+            self.stack = lambda x: x
+            self.matvec = mb.matmul
+            self.prod = lambda x: mb.prod(x, axis=1)
+            self.lerp = lambda x, y, z: x*(1-z) + y*(z)
+            self.minimum = lambda x, y: mb.minimum(x, y)
+            self.maximum = lambda x, y: mb.maximum(x, y)
+            self.module = object
 
-            # Using image_input in the inputs parameter:
-            # Convert to Core ML program using the Unified Conversion API.
-            model = ct.convert(
-                traced_model,
-                convert_to="mlprogram",
-                inputs=[ct.TensorType(name="input", shape=(1,)),
-                        ct.TensorType(name="state", shape=(5*self.n_layers, embed))],
+            self.log = mb.log
 
-            )
+            self.getIndex = lambda x, y: mb.gather((x, y))
 
-            class interop:
-                def __init__(self, model):
-                    self.model = model
+            def ln(x, w, b):
+                xee2 = x - self.mean(x)
 
-                def __call__(self, x, state):
-                    return self.model({"input": x, "state": state})
+                x2 = self.sqrt(self.mean(xee2*xee2) + 0.000009999999747378752)
 
-            return interop(model)
+                return w*(xee2/x2) + b
+            self.layernorm = ln
 
-        self.postProcessModule = exportTorchScript
+            def ppm(x):
+                inp0, inp1 = ssa_fun.inputs["x"], [
+                    ssa_fun.inputs[f"state{i}"] for i in range(5*layers)]
+                re = x.forward(inp0, inp1)
+                print(re)
+                ssa_fun.set_outputs([re])
+
+        self.postProcessModule = ppm

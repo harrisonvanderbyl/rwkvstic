@@ -14,6 +14,8 @@ def initRwkvRsFile(model_path, tokenizer=None):
     emptyState = rwkv_rs.State(rsmodel)
 
     class InterOp():
+        RnnOnly = True
+
         def forward(self, x, y):
             logits = rsmodel.forward_token(x[-1], y)
 

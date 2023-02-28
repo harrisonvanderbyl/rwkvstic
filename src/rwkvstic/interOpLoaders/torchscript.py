@@ -12,6 +12,8 @@ def initTorchScriptFile(path, tokenizer=None):
     print("input shape", dtype)
 
     class InterOp():
+        RnnOnly = not True
+
         def forward(self, x, y):
 
             mm, nn = mymodel(torch.LongTensor(x), y)
@@ -24,5 +26,5 @@ def initTorchScriptFile(path, tokenizer=None):
     def initTensor(x): return torch.tensor(x, dtype=dtype, device=device)
 
     useSampler = "sampler" not in path
-
-    return RWKVMaster(model, emptyState, initTensor, npsample if useSampler else None, tokenizer)
+    def intTensor(x): return [x] if type(x) == int else x
+    return RWKVMaster(model, emptyState, initTensor, intTensor, npsample if useSampler else None, tokenizer)
