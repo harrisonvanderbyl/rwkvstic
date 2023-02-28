@@ -22,6 +22,7 @@ class RWKVTFOps(RWKVOp.module):
         super(RWKVTFOps, self).__init__(layers, embed, *args, **kwargs)
         self.initTensor = lambda x: tf.convert_to_tensor(
             x.float().cpu().numpy())
+        self.mnstack = tf.stack
 
         self.sqrt = tf.sqrt
         self.mean = tf.reduce_mean

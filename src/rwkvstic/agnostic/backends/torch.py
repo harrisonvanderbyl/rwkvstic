@@ -41,7 +41,10 @@ class RWKVPTOps(RWKVOp.module):
         self.sqrt = torch.sqrt
         self.mean = torch.mean
         self.relu = torch.relu
-        self.stack = torch.stack
+        def tc(x): return torch.stack(x)
+        self.stack = tc
+        def tcs(x): return x
+        self.mnstack = tcs
         def roll(x): return torch.roll(x, x.shape[1])
         self.roll = roll
         def lenn(x): return x.shape[0]

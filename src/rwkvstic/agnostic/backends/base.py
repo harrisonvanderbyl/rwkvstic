@@ -69,6 +69,7 @@ class module:
         self.logistical = logistical
         self.neg = lambda x: -x
         self.postProcessModule = lambda x: x
+        self.mnstack = lambda x: x
 
         self.sample = npsample
         def emptyarray(x: int): return [0]*x

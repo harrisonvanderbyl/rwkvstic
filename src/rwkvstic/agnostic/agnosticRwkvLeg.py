@@ -18,41 +18,41 @@ def LegacyRWKV(ops: module, *args):
             self.emb: ops.MatrixType = w["emb.weight"]
             self.emb1: ops.VectorType = w["blocks.0.ln0.weight"]
             self.emb2: ops.VectorType = w["blocks.0.ln0.bias"]
-            self.ln1w: ops.VectorType = ops.stack(
+            self.ln1w: ops.VectorType = ops.mnstack(
                 [w[f"blocks.{x}.ln1.weight"] for x in range(ops.n_layers)])
-            self.ln1b: ops.VectorType = ops.stack(
+            self.ln1b: ops.VectorType = ops.mnstack(
                 [w[f"blocks.{x}.ln1.bias"] for x in range(ops.n_layers)])
-            self.ln2w: ops.VectorType = ops.stack(
+            self.ln2w: ops.VectorType = ops.mnstack(
                 [w[f"blocks.{x}.ln2.weight"] for x in range(ops.n_layers)])
-            self.ln2b: ops.VectorType = ops.stack(
+            self.ln2b: ops.VectorType = ops.mnstack(
                 [w[f"blocks.{x}.ln2.bias"] for x in range(ops.n_layers)])
-            self.time_decay: ops.VectorType = ops.stack([
+            self.time_decay: ops.VectorType = ops.mnstack([
                 w[f"blocks.{x}.att.time_decay"] for x in range(ops.n_layers)])
-            self.time_first: ops.VectorType = ops.stack([
+            self.time_first: ops.VectorType = ops.mnstack([
                 w[f"blocks.{x}.att.time_first"] for x in range(ops.n_layers)])
-            self.kktk: ops.VectorType = ops.stack(
+            self.kktk: ops.VectorType = ops.mnstack(
                 [w[f"blocks.{x}.att.time_mix_k"] for x in range(ops.n_layers)])
-            self.vvtv: ops.VectorType = ops.stack(
+            self.vvtv: ops.VectorType = ops.mnstack(
                 [w[f"blocks.{x}.att.time_mix_v"] for x in range(ops.n_layers)])
-            self.rrtr: ops.VectorType = ops.stack(
+            self.rrtr: ops.VectorType = ops.mnstack(
                 [w[f"blocks.{x}.att.time_mix_r"] for x in range(ops.n_layers)])
-            self.key: ops.MatrixType = ops.stack(
+            self.key: ops.MatrixType = ops.mnstack(
                 [w[f"blocks.{x}.att.key.weight"] for x in range(ops.n_layers)])
-            self.value: ops.MatrixType = ops.stack(
+            self.value: ops.MatrixType = ops.mnstack(
                 [w[f"blocks.{x}.att.value.weight"] for x in range(ops.n_layers)])
-            self.receptance: ops.MatrixType = ops.stack([
+            self.receptance: ops.MatrixType = ops.mnstack([
                 w[f"blocks.{x}.att.receptance.weight"] for x in range(ops.n_layers)])
-            self.outputvv: ops.MatrixType = ops.stack([
+            self.outputvv: ops.MatrixType = ops.mnstack([
                 w[f"blocks.{x}.att.output.weight"] for x in range(ops.n_layers)])
-            self.time_mix_k_ffn: ops.VectorType = ops.stack([
+            self.time_mix_k_ffn: ops.VectorType = ops.mnstack([
                 w[f"blocks.{x}.ffn.time_mix_k"] for x in range(ops.n_layers)])
-            self.time_mix_r_ffn: ops.VectorType = ops.stack([
+            self.time_mix_r_ffn: ops.VectorType = ops.mnstack([
                 w[f"blocks.{x}.ffn.time_mix_r"] for x in range(ops.n_layers)])
-            self.key_ffn: ops.MatrixType = ops.stack(
+            self.key_ffn: ops.MatrixType = ops.mnstack(
                 [w[f"blocks.{x}.ffn.key.weight"] for x in range(ops.n_layers)])
-            self.receptance_ffn: ops.MatrixType = ops.stack([
+            self.receptance_ffn: ops.MatrixType = ops.mnstack([
                 w[f"blocks.{x}.ffn.receptance.weight"] for x in range(ops.n_layers)])
-            self.value_ffn: ops.MatrixType = ops.stack([
+            self.value_ffn: ops.MatrixType = ops.mnstack([
                 w[f"blocks.{x}.ffn.value.weight"] for x in range(ops.n_layers)])
 
         @ops.layerdef

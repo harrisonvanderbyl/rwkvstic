@@ -9,7 +9,9 @@ import time
 
 def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
     tt = time.time()
+
     o = model.forward(newctx, statex)
+
     print("loaded context in", time.time()-tt, "seconds")
     print(o[0][0])
     return newctx, o[1]

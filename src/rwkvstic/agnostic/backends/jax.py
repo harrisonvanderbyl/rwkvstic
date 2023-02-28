@@ -55,6 +55,7 @@ class RWKVJaxOps(RWKVOp.module):
         self.relu = lambda x: npjax.maximum(x, 0)
         self.exp = lambda x: npjax.exp(x)
         self.stack = lambda x: npjax.array(x)
+        self.mnstack = lambda x: npjax.array(x)
         self.matvec = lambda x, y: npjax.matmul(x, y.T).T
         self.prod = lambda x: npjax.prod(x, axis=1)
         self.lerp = lambda x, y, z: npjax.array(x)*(1-z) + npjax.array(y)*(z)
