@@ -1,5 +1,6 @@
 from rwkvstic.agnostic.backends.base import module
-from typing import Dict
+from typing import Dict, List
+import torch
 
 
 def AgnosticRWKV(ops: module, *args):
@@ -58,7 +59,7 @@ def AgnosticRWKV(ops: module, *args):
             if ops.useLogFix:
                 self.processLayer = self.processLayerx
 
-        def processLayerx(self, k, v, rz, state, xx: int, i: int):
+        def processLayerx(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
             ww = self.time_first[xx] + k[i]
             p = self.maximum(state[4], ww)
 
@@ -89,22 +90,22 @@ def AgnosticRWKV(ops: module, *args):
 
             # state[2:5] = ops.stack((outb, outc, p1))
 
-            state = self.scatter(state, self.scatterindices[0], ops.stack(
+            state = self.scatter(state, self.scatterindices[0], self.stack(
                 (outb, outc, p1)))
             wkv = self.divide(a, b)
             rz = self.arrayPush(rz, wkv, i)
             return rz, state
 
-        def processLayer(self, k, v, rz, state, xx: int, i: int):
-            ki = ops.exp(k[i])
-            wrd = ops.divide(
-                ops.add(state[2], ops.multiply(ops.multiply(ki, v[i]), ops.exp(self.time_first[xx]))), ops.add(state[3], ops.multiply(ki, ops.exp(self.time_first[xx]))))
+        def processLayer(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
+            ki = self.exp(k[i])
+            wrd = self.divide(
+                self.add(state[2], self.multiply(self.multiply(ki, v[i]), self.exp(self.time_first[xx]))), self.add(state[3], self.multiply(ki, self.exp(self.time_first[xx]))))
 
-            state = ops.scatter(state, ops.scatterindices[1], ops.multiply(ops.exp(self.time_decay[xx]), ops.add(
-                state[2:4], ops.stack((ops.multiply(
+            state = self.scatter(state, self.scatterindices[1], self.multiply(self.exp(self.time_decay[xx]), self.add(
+                state[2:4], self.stack((self.multiply(
                     v[i], ki), ki)))))
 
-            rz = ops.arrayPush(rz, wrd, i)
+            rz = self.arrayPush(rz, wrd, i)
             return rz, state
 
         @ ops.layerdef
@@ -139,7 +140,7 @@ def AgnosticRWKV(ops: module, *args):
             rc = self.push(self.roll(ddd), state[1])
             # self.arrayPush(state, xy[-1], 0)
             # self.arrayPush(state, ddd[-1], 1)
-            state = self.scatter(state, self.scatterindices[2], ops.stack(
+            state = self.scatter(state, self.scatterindices[2], self.stack(
                 (xy[-1], ddd[-1])))
 
             km = self.relu(self.matvec(self.key_ffn[xx], self.lerp(

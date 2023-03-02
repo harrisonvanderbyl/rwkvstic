@@ -105,7 +105,7 @@ class RWKVPTOps(RWKVOp.module):
             o = w*(xee2/x2) + b
 
             return o
-            # nan on cuda
+
             # return torch.nn.functional.layer_norm(x, x.shape, w.expand(x.shape), b.expand(x.shape))
 
         self.layernorm = ln
