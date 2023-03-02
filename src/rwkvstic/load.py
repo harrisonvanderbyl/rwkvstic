@@ -1,8 +1,7 @@
 
-from rwkvstic.agnostic.agnosticRwkvLeg import LegacyRWKV
+from rwkvstic.agnostic.agnosticRwkv import AgnosticRWKV
 from rwkvstic.agnostic.rnn import RnnRWKV
 from rwkvstic.helpers.loadWeights import loadWeights
-from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
 from rwkvstic.agnostic.backends import Backends
 from rwkvstic.interOpLoaders import tflite, torchscript, prequantized, preJax, rwkvRs, onnx
 from rwkvstic.rwkvMaster import RWKVMaster
@@ -67,10 +66,7 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
     gc.collect()
     if ops.RnnOnly:
         model = RnnRWKV(ops, weights)
-    if ops.useLogFix:
-        model = LegacyRWKV(ops, weights)
-    else:
-        model = AgnostigRWKV(ops, weights)
+    model = AgnosticRWKV(ops, weights)
     emptyState = ops.emptyState
     initTensor = ops.initTensor
 

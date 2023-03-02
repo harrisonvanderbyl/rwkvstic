@@ -21,7 +21,7 @@ def initTorchScriptFile(path, tokenizer=None):
             return mm.cpu(), nn
     model = InterOp()
     emptyState = torch.tensor(
-        [[0.01]*int(embed)]*int(layers)*5, dtype=dtype, device=device)
+        [[[0.01]*int(embed)]*5]*int(layers), dtype=dtype, device=device)
 
     def initTensor(x): return torch.tensor(x, dtype=dtype, device=device)
 

@@ -70,6 +70,14 @@ class RWKVJaxOps(RWKVOp.module):
         self.layerdef = lambda x: x
         self.mainfunc = lambda x: x
         def getIndex(x, y): return npjax.array([x[z] for z in y])
+
+        def scatter(x, y, z):
+            x = x.at[y].set(z)
+            return x
+
+        self.scatterindices = [slice(2, 5), slice(2, 4), slice(0, 2)]
+
+        self.scatter = scatter
         self.getIndex = getIndex
         # in postfunc, convert to numpy
 

@@ -62,11 +62,6 @@ def loadWeights(mode, path, *args, processEmb=True, **kwargs):
 
         if '.time_decay' in x:
             w[x] = -torch.exp(w[x].double())
-            if not ops.useLogFix:
-                w[x] = torch.exp(w[x])
-
-        if "time_fir" in x and not ops.useLogFix:
-            w[x] = torch.exp(w[x].double())
 
         if 'receptance.weight' in x:
             w[x] = w[x]

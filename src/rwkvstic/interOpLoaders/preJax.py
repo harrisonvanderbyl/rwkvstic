@@ -1,6 +1,6 @@
 
 from rwkvstic.rwkvMaster import RWKVMaster
-from rwkvstic.agnostic.agnosticRwkv import AgnostigRWKV
+from rwkvstic.agnostic.agnosticRwkv import AgnosticRWKV
 
 from rwkvstic.agnostic.backends.jax import RWKVJaxOps
 
@@ -26,7 +26,7 @@ def loadPreJax(path, tokenizer=None):
 
         weights[w] = ops.initTensor(weights[w])
 
-    model = AgnostigRWKV(ops, weights)
+    model = AgnosticRWKV(ops, weights)
     emptyState = ops.emptyState
     initTensor = ops.initTensor
 

@@ -58,8 +58,8 @@ class module:
         self.mainfunc = lambda x: x
 
         import numpy as np
-        self.emptyState: self.MatrixType = np.array((([[0.00]*embed, [0.00]*embed, [0.00]*embed, [
-            0.00]*embed]+([[-1e30]*embed] if self.useLogFix else [])))*layers)
+        self.emptyState: self.MatrixType = np.array([(([[0.00]*embed, [0.00]*embed, [0.00]*embed, [
+            0.00]*embed]+([[-1e30]*embed] if self.useLogFix else [])))]*layers)
 
         print(self.emptyState.shape)
 
@@ -99,7 +99,15 @@ class module:
         self.stackEmb = False
 
         def getIndex(x, y): return x[y]
+
         self.getIndex = getIndex
+
+        def scatter(x, y, z):
+            x[y] = z
+            return x
+        self.scatterindices = [slice(2, 5), slice(2, 4), slice(0, 2)]
+
+        self.scatter = scatter
 
 
 class rnnmodule:

@@ -59,7 +59,7 @@ class RWKVTFOps(RWKVOp.module):
         self.arrayGet = arrayGet
 
         def stack(x):
-            return tf.stack(x) if type(x) == list else x.stack()
+            return tf.stack(x) if type(x) == list or type(x) == tuple else x.stack()
         self.stack = stack
         self.roll = roll
         def pop(x): return x[-1]
@@ -82,12 +82,28 @@ class RWKVTFOps(RWKVOp.module):
        # tensorflow function defs
         self.initfunc = lambda x: x
         self.layerdef = tf.function(
-            input_signature=[tf.TensorSpec(shape=[None, None], dtype=tf.float32)]+(4+self.useLogFix)*[tf.TensorSpec(shape=[None], dtype=tf.float32)]+[tf.TensorSpec(dtype=tf.int32, shape=None)])
+            input_signature=[tf.TensorSpec(shape=[None, embed], dtype=tf.float32), tf.TensorSpec(shape=[None, None], dtype=tf.float32), tf.TensorSpec(dtype=tf.int32, shape=None)])
 
         self.mainfunc = tf.function(input_signature=[tf.TensorSpec(shape=[None], dtype=tf.int64), tf.TensorSpec(
-            shape=[(4+self.useLogFix)*layers, embed], dtype=tf.float32)])
+            shape=[self.n_layers, (4+self.useLogFix), embed], dtype=tf.float32)])
         self.emptyState = tf.convert_to_tensor(
             self.emptyState, dtype=tf.float32)
+
+        # self.scatterindices = [slice(2, 5), slice(2, 4), slice(0, 2)]
+
+        # def scatter(x, y, z):
+        #     x = x.at[y].set(z)
+        #     return x
+        # work around for tensorflow not supporting item assignment
+        def scatter(x, y, z):
+            rx = tf.concat([x[:y[0]], z, x[y[1]:]], axis=0) if type(
+                y) == tuple else tf.reshape(tf.concat([x[:y], [z], x[y+1:]], axis=0), ((layers, 4+self.useLogFix, embed)))
+
+            return rx
+
+        self.scatter = scatter
+
+        self.scatterindices = [(2, 5), (2, 4), (0, 2)]
 
         def ln(x, w, b):
             # layernorm batchnorm
