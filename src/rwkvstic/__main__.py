@@ -10,6 +10,10 @@ if __name__ == '__main__':
     if ("--server" in argv):
         import rwkvstic.server as server
         server.runServer()
+    if ("--onnx" in argv):
+        from rwkvstic.load import RWKV
+        from rwkvstic.agnostic.backends import ONNX_EXPORT
+        RWKV(mode=ONNX_EXPORT)
     pq.preQuantized(**args)
     if (argv[-1] == "--preJax"):
         pj.preJax()

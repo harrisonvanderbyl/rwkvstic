@@ -28,8 +28,8 @@ class RWKVOnnxOps(RWKVOp.rnnmodule):
         nptype = np.float32 if dtype == onnx.TensorProto.FLOAT else np.float16 if dtype == onnx.TensorProto.FLOAT16 else np.float16 if dtype == onnx.TensorProto.BFLOAT16 else np.float32
 
         self.nm = 0
-        exportname = f"RWKV_{layers}_{embed}.onnx"
-        externalname = f"RWKV_{layers}_{embed}.bin"
+        exportname = f"RWKV_{layers}_{embed}_{'32' if dtype == onnx.TensorProto.FLOAT else '16'}.onnx"
+        externalname = f"RWKV_{layers}_{embed}_{'32' if dtype == onnx.TensorProto.FLOAT else '16'}.bin"
 
         # remove old files
         import os
