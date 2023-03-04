@@ -20,7 +20,7 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
         files = os.listdir()
         # filter by ending in .pth
         files = [f for f in files if f.endswith(
-            ".pth") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth") or f.endswith(".jax.npy") or f.endswith(".safetensors") or f.endswith(".onnx")]
+            ".pth") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth") or f.endswith(".jax.npy") or f.endswith(".safetensors") or f.endswith(".onnx") or f.endswith(".ort")]
 
         questions = [
             inquirer.List('file',
@@ -52,8 +52,8 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
         return prequantized.loadPreQuantized(path, tokenizer)
     elif path.endswith(".jax.npy"):
         return preJax.loadPreJax(path, tokenizer)
-    elif path.endswith(".onnx"):
-        return onnx.initONNXFile(path, tokenizer)
+    elif path.endswith(".onnx") or path.endswith(".ort"):
+        return onnx.initONNXFile(path, tokenizer, *args, **kwargs)
 
     if mode is None:
         mode: str = inquirer.prompt([inquirer.List('mode',

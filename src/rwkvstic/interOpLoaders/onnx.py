@@ -3,7 +3,7 @@ from rwkvstic.agnostic.samplers.numpy import npsample
 from rwkvstic.rwkvMaster import RWKVMaster
 
 
-def initONNXFile(path, tokenizer=None):
+def initONNXFile(path, tokenizer=None, useAllAvailableProviders=True):
     import onnxruntime as rt
 
     # session execution provider options
@@ -12,7 +12,7 @@ def initONNXFile(path, tokenizer=None):
     print(rt.get_available_providers())
     import inquirer
     providers = inquirer.checkbox(
-        "Select execution providers", choices=rt.get_available_providers())
+        "Select execution providers", choices=rt.get_available_providers()) if not useAllAvailableProviders else rt.get_available_providers()
     print(providers)
 
     sess = rt.InferenceSession(
