@@ -43,19 +43,23 @@ class RWKVNumpyOps(RWKVOp.module):
 
 
 class RWKVJaxOps(RWKVOp.module):
-    def __init__(self, layers, embed, *args, preJax=False, **kwargs):
+    def __init__(self, layers, embed, *args, dtype=None, preJax=False, **kwargs):
         from jax import numpy as npjax
         super().__init__(layers, embed, *args, **kwargs)
+        import inquirer
+        self.dtype = dtype if dtype else inquirer.prompt([inquirer.List(
+            'dtype', message="Choose a dtype", choices=[npjax.bfloat16, npjax.float16, npjax.float32, npjax.float64])])['dtype']
         if preJax:
-            self.initTensor = lambda x: npjax.array(x)
+            self.initTensor = lambda x: npjax.array(x, dtype=dtype)
         else:
-            self.initTensor = lambda x: npjax.array(x.float().cpu().numpy())
+            self.initTensor = lambda x: npjax.array(
+                x.float().cpu().numpy(), dtype=dtype)
         self.sqrt = lambda x: npjax.sqrt(x)
         self.mean = npjax.mean
         self.relu = lambda x: npjax.maximum(x, 0)
         self.exp = lambda x: npjax.exp(x)
-        self.stack = lambda x: npjax.array(x)
-        self.mnstack = lambda x: npjax.array(x)
+        self.stack = lambda x: npjax.array(x, dtype=dtype)
+        self.mnstack = lambda x: npjax.array(x, dtype=dtype)
         self.matvec = lambda x, y: npjax.matmul(x, y.T).T
         self.prod = lambda x: npjax.prod(x, axis=1)
         self.lerp = lambda x, y, z: npjax.array(x)*(1-z) + npjax.array(y)*(z)
@@ -79,7 +83,7 @@ class RWKVJaxOps(RWKVOp.module):
 
         self.scatter = scatter
         self.getIndex = getIndex
-        # in postfunc, convert to numpy
+        # in pgetInostfunc, convert to numpy
 
         def ln(x, w, b):
             xee2 = x - self.mean(x, axis=1, keepdims=True)
