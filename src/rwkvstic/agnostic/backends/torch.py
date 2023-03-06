@@ -24,6 +24,9 @@ class RWKVPTOps(RWKVOp.module):
         def initTensor(x):
             result = x.to(dtype=self.dtype)
 
+            if len(result.squeeze().shape) == 2:
+                result = result.t()
+
             return result
 
         self.initTensor = initTensor
@@ -49,7 +52,7 @@ class RWKVPTOps(RWKVOp.module):
         def lenn(x): return x.shape[0]
         self.len = lenn
         self.cat = torch.cat
-        def matvec(x, y): return torch.matmul(x, y.t()).t()
+        def matvec(x, y): return torch.matmul(y, x)
         self.matvec = matvec
 
         def prod(x): return torch.prod(x, dim=1)
@@ -110,7 +113,7 @@ class RWKVPTOps(RWKVOp.module):
 
         self.layernorm = ln
         self.emptyState = torch.tensor(self.emptyState, dtype=self.dtype)
-
+        self.stackEmb = True
         self.TensorType = torch.Tensor
         self.MatrixType = torch.Tensor
         self.VectorType = torch.Tensor
@@ -120,7 +123,7 @@ class RWKVPTOps(RWKVOp.module):
 
 
 class RWKVCudaOps(RWKVPTOps):
-    def __init__(self, layers, embed, *args, useGPU=None, runtimedtype=None, **kwargs):
+    def __init__(self, layers, embed, *args, useGPU=None, runtimedtype=None, dev="cuda", **kwargs):
         super().__init__(layers, embed, *args, **kwargs)
         import inquirer
         import torch
@@ -141,23 +144,33 @@ class RWKVCudaOps(RWKVPTOps):
         self.runtimedtype = runtimedtype
 
         def initTensor(x):
-            ret = x.to(dtype=self.dtype if len(x.shape) > 1 else runtimedtype).cuda(
-                non_blocking=True)
+            ret = x.to(dtype=self.dtype if len(x.shape) > 1 else runtimedtype).to(dev,
+                                                                                  non_blocking=True)
+
+            if len(ret.squeeze().shape) == 2:
+                ret = ret.t()
             return ret
 
         self.initTensor = initTensor
 
         self.initCpuTensor = lambda x: x.to(dtype=self.runtimedtype)
 
-        def processEmbed(x): return x.to(device='cuda')
+        def processEmbed(x): return x.to(device=dev)
 
         self.processEmbed = processEmbed
 
-        def matvec(x, y): return x.matmul(
-            y.to(dtype=x.dtype).t()).to(dtype=y.dtype).t()
+        def matvec(x, y): return y.to(dtype=x.dtype).matmul(x
+                                                            ).to(dtype=y.dtype)
         self.matvec = matvec
 
-        self.emptyState = self.emptyState.to(dtype=runtimedtype, device='cuda')
+        self.emptyState = self.emptyState.to(dtype=runtimedtype, device=dev)
+
+
+class RWKVMpsOps(RWKVCudaOps):
+    def __init__(self, layers, embed, *args, **kwargs):
+        super().__init__(layers, embed, dev="mps", *args, **kwargs)
+
+        self.lerp = lambda x, y, z: x + (y-x)*z
 
 
 class RWKVPTTSExportOps(RWKVCudaOps):
@@ -235,8 +248,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
             yy = yy.to(dtype=dtype)
 
-            xmain = rx.to(dtype=dtype, device=y.device, non_blocking=True).matmul(
-                yy.t()).to(dtype=runtimedtype).t()
+            xmain = yy.matmul(
+                rx.to(dtype=dtype, device=y.device, non_blocking=True)).to(dtype=runtimedtype)
             zp = (y@zpoint).reshape(-1, 1)
             return xmain + zp
         dev = 'cuda' if (inquirer.confirm(
@@ -286,7 +299,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
             xx = [QuantizeMatrix(x, runtimedtype, dev, dostream)
                   for x in splitmatrices]
-            xxo = torch.cat([x[0] for x in xx], 1)
+            xxo = torch.cat([x[0] for x in xx], 1).t()
             xx1 = torch.cat([x[1] for x in xx])
             xx2 = torch.cat([x[2] for x in xx])
             return xxo, xx1, xx2
