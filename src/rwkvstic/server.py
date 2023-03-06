@@ -65,6 +65,9 @@ def runServer():
             body = json.loads(body)
             if body.get("state", None) is not None:
                 body["state"] = model.initTensor(body["state"])
+            else:
+                model.resetState()
+                body["state"] = model.getState()
 
             if body.get("input", None) is not None:
                 body["state"] = model.loadContext(
