@@ -73,9 +73,9 @@ def runServer():
 
             print(body)
             output = model.forward(**body)
-            output["state"] = [x.cpu().numpy().tolist()
+            output["state"] = [x.cpu().float().numpy().tolist()
                                for x in output["state"]]
-            output["logits"] = output["logits"].cpu().numpy().tolist()
+            output["logits"] = output["logits"].cpu().float().numpy().tolist()
 
             self.send_response(200)
             self.send_header("Content-type", "text/json")
