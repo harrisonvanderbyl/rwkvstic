@@ -221,7 +221,7 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 class RWKVCudaQuantOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.bfloat16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, **kwargs):
+    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.bfloat16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
         import torch
         import inquirer
         super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
@@ -252,7 +252,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
                 rx.to(dtype=dtype, device=y.device, non_blocking=True)).to(dtype=runtimedtype)
             zp = (y@zpoint).reshape(-1, 1)
             return xmain + zp
-        dev = 'cuda' if (inquirer.confirm(
+        cuda = dev
+        dev = cuda if (inquirer.confirm(
             "Use GPU?", default=True) if useGPU is None else useGPU) else 'cpu'
 
         # target is gb before cpu offload
@@ -275,7 +276,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
         def initTensor(x):
 
             dostream = (torch.cuda.max_memory_reserved(
-                0)/1024/1024/1024 > target) if dev == "cuda" else False
+                0)/1024/1024/1024 > target) if dev == cuda else False
 
             if preQuantized and len(x) == 3:
                 return x[0].to(device=dev), x[1].to(dtype=runtimedtype, device=dev), x[2].to(dtype=runtimedtype, device=dev)
@@ -287,7 +288,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
                 return x.to(dtype=dtype, device=dev)
 
             dontQuantize = (torch.cuda.max_memory_reserved(
-                0)/1024/1024/1024 > maxQuantTarget) if dev == "cuda" else False
+                0)/1024/1024/1024 > maxQuantTarget) if dev == cuda else False
 
             if dontQuantize:
                 if dostream:
@@ -328,6 +329,23 @@ class RWKVStreamBigOps(RWKVCudaQuantOps):
     def __init__(self, layers, embed, *args, **kwargs):
 
         super().__init__(layers, embed, *args, useGPU=True,
+                         chunksize=1, maxQuantTarget=-1, **kwargs)
+
+
+class RWKVQuantMPSOps(RWKVCudaQuantOps):
+
+    def __init__(self, layers, embed, *args, **kwargs):
+
+        super().__init__(layers, embed, *args, dev="mps", **kwargs)
+
+        self.lerp = lambda x, y, z: x*(1-z)+y*z
+
+
+class RWKVStreamMPSOps(RWKVQuantMPSOps):
+
+    def __init__(self, layers, embed, *args, **kwargs):
+
+        super().__init__(layers, embed,  *args, useGPU=True,
                          chunksize=1, maxQuantTarget=-1, **kwargs)
 
 
