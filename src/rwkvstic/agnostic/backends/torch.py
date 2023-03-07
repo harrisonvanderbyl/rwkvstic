@@ -221,7 +221,7 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 class RWKVCudaQuantOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.bfloat16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
+    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.float16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
         import torch
         import inquirer
         super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
@@ -335,10 +335,13 @@ class RWKVStreamBigOps(RWKVCudaQuantOps):
 class RWKVQuantMPSOps(RWKVCudaQuantOps):
 
     def __init__(self, layers, embed, *args, **kwargs):
-
+        import torch
         super().__init__(layers, embed, *args, dev="mps", **kwargs)
 
         self.lerp = lambda x, y, z: x*(1-z)+y*z
+        # roll not implemented in mps, makiing compatible
+        self.roll = lambda x: x.gather(
+            dim=0, index=(torch.arange(x.shape[0])-1).relu())
 
 
 class RWKVStreamMPSOps(RWKVQuantMPSOps):
