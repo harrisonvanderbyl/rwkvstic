@@ -167,10 +167,12 @@ class RWKVCudaOps(RWKVPTOps):
 
 
 class RWKVMpsOps(RWKVCudaOps):
+
     def __init__(self, layers, embed, *args, **kwargs):
         super().__init__(layers, embed, dev="mps", *args, **kwargs)
-
+        import torch
         self.lerp = lambda x, y, z: x + (y-x)*z
+        self.roll = lambda x: x[(torch.arange(x.shape[0])-1).relu()]
 
 
 class RWKVPTTSExportOps(RWKVCudaOps):
@@ -340,8 +342,7 @@ class RWKVQuantMPSOps(RWKVCudaQuantOps):
 
         self.lerp = lambda x, y, z: x*(1-z)+y*z
         # roll not implemented in mps, makiing compatible
-        self.roll = lambda x: x.gather(
-            dim=0, index=(torch.arange(x.shape[0])-1).relu())
+        self.roll = lambda x: x[(torch.arange(x.shape[0])-1).relu()]
 
 
 class RWKVStreamMPSOps(RWKVQuantMPSOps):
