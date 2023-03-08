@@ -25,5 +25,7 @@ def loadPreQuantized(path, tokenizer=None):
     model = AgnosticRWKV(ops, weights)
     emptyState = ops.emptyState
     initTensor = ops.initTensor
+    intTensor = ops.intTensor
+    sample = ops.sample
 
-    return RWKVMaster(model, emptyState, initTensor, ops.sample, tokenizer)
+    return RWKVMaster(model, emptyState, initTensor, intTensor, sample, tokenizer)
