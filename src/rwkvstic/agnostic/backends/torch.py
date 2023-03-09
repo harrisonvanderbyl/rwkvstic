@@ -365,7 +365,7 @@ class RWKVSplitCudaOps(RWKVPTOps):
             'Which devices would you like to use?', choices=['cpu', *[f"cuda:{x}" for x in range(torch.cuda.device_count())]]) if devices is None else devices
 
         self.initTensor = lambda x: x.to(dtype=runtimedtype).cuda() if len(
-            x.shape) == 1 else list(map(lambda zx: zx[1].to(device=devices[zx[0]], dtype=torch.float32 if "cpu" in devices[zx[0]] else torch.bfloat16), enumerate(list(x.chunk(len(devices), dim=1)))))
+            x.shape) == 1 else list(map(lambda zx: zx[1].to(device=devices[zx[0]], dtype=torch.float32 if "cpu" in devices[zx[0]] else torch.bfloat16), enumerate(list(x.t().chunk(len(devices), dim=0)))))
         self.initCpuTensor = lambda x: x.to(dtype=runtimedtype)
 
         # for everything in self, if its a tensor, send to cuda
@@ -376,17 +376,15 @@ class RWKVSplitCudaOps(RWKVPTOps):
 
         def matvec(matx, y):
             chunks = list(map(lambda xx: xx[1].to(
-                device=devices[xx[0]], dtype=matx[xx[0]].dtype, non_blocking=True), enumerate(y.chunk(len(devices), dim=0))))
-            res = matx[0].mv(chunks[0]).to(
+                device=devices[xx[0]], dtype=matx[xx[0]].dtype, non_blocking=True), enumerate(y.chunk(len(devices), dim=1))))
+            res = chunks[0].matmul(matx[0]).to(
                 dtype=runtimedtype, device=y.device, non_blocking=True)
             for i in range(1, len(chunks)):
-                res = res + matx[i].mv(chunks[i]).to(
-                    dtype=runtimedtype, device=y.device, non_blocking=True)
+                res = res.t() + chunks[i].matmul(matx[i]).to(
+                    dtype=runtimedtype, device=y.device, non_blocking=True).t()
+                res = res.t()
 
             return res
-
-        self.stack = lambda x: x
+        self.processEmbed = lambda x: x.to(device='cuda')
 
         self.matvec = matvec
-        self.layernorm = lambda x, w, b: torch.layer_norm(
-            x.to(device=w.device), w.shape, w, b)
