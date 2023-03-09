@@ -1,4 +1,4 @@
-import torch
+
 import tqdm
 import rwkvstic.tokenizer as tokenizer
 from typing import List
@@ -26,18 +26,19 @@ def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
 
 def rnnloadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
 
-    with torch.jit.optimized_execution(True):
-        for i in tqdm.tqdm(range(len(newctx))):
+    
+    for i in tqdm.tqdm(range(len(newctx))):
 
-            x = ctx+newctx[:i]
+        x = ctx+newctx[:i]
 
-            o = model.forward([x[-1]], statex)
-            statex = o[1]
-            progressCallBack(x)
+        o = model.forward([x[-1]], statex)
+        statex = o[1]
+        progressCallBack(x)
     return ctx+newctx, o[1]
 
 
 class RWKVMaster():
+    
     def __init__(self, model, emptyState, initTensor=lambda x: x, intTensor=lambda x: x, sampler=None, tokPath=None):
         self.model = model
 

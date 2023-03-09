@@ -1,9 +1,10 @@
 
-import numpy as np
-from scipy.special import softmax
 
 
 def npsample(ozut, temp: float = 1.0, top_p_usual: float = 0.8) -> int:
+    import numpy as np
+    from scipy.special import softmax
+
     try:
         ozut = ozut.numpy()
     except:

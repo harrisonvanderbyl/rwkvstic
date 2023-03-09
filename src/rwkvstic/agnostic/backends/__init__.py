@@ -1,5 +1,5 @@
 from rwkvstic.agnostic.backends.torch import RWKVCudaOps, RWKVPTTSExportOps, RWKVSplitCudaOps, RWKVCudaQuantOps, RWKVStreamBigOps, RWKVCudaDeepspeedOps, RWKVMpsOps, RWKVQuantMPSOps, RWKVStreamMPSOps
-from rwkvstic.agnostic.backends.jax import RWKVJaxOps, RWKVNumpyOps
+from rwkvstic.agnostic.backends.jax import RWKVJaxOps, RWKVNumpyOps, RWKVCuPyOps, RWKVCuPyQuantOps
 from rwkvstic.agnostic.backends.tensorflow import RWKVTFExport, RWKVTFOps
 from rwkvstic.agnostic.backends.base import module
 from rwkvstic.agnostic.backends.onnx import RWKVOnnxOps
@@ -12,6 +12,8 @@ Backends: Dict[str, module] = {
     "mps(mac/gpu)": RWKVMpsOps,
     "numpy(cpu)": RWKVNumpyOps,
     "jax(cpu/gpu/tpu)": RWKVJaxOps,
+    "cupy(cpu/gpy)": RWKVCuPyOps,
+    "cupy-quant(cpu/gpu)": RWKVCuPyQuantOps,
     "pytorch-deepspeed(gpu)": RWKVCudaDeepspeedOps,
     "pytorch-quant(gpu-8bit)": RWKVCudaQuantOps,
     "pytorch-stream(gpu-config-vram)": RWKVStreamBigOps,
@@ -28,6 +30,8 @@ Backends: Dict[str, module] = {
 TORCH = "pytorch(cpu/gpu)"
 JAX = "jax(cpu/gpu/tpu)"
 TF = "tensorflow(cpu/gpu)"
+CUPY = "cupy(gpu)"
+CUPY_QUANT = "cupy-quant(gpu)"
 TORCH_DEEPSPEED = "pytorch-deepspeed(gpu)"
 TORCH_QUANT = "pytorch-quant(gpu-8bit)"
 TORCH_STREAM = "pytorch-stream(gpu-config-vram)"
