@@ -3,7 +3,7 @@ from rwkvstic.agnostic.agnosticRwkv import AgnosticRWKV
 from rwkvstic.agnostic.rnn import RnnRWKV
 from rwkvstic.helpers.loadWeights import loadWeights
 from rwkvstic.agnostic.backends import Backends
-from rwkvstic.interOpLoaders import tflite, torchscript, prequantized, preJax, rwkvRs, onnx
+from rwkvstic.interOpLoaders import tflite, torchscript, prequantized, preJax, rwkvRs, onnx, chatRWKV
 from rwkvstic.rwkvMaster import RWKVMaster
 import gc
 from typing import Tuple
@@ -37,6 +37,9 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
             if not os.path.exists(fileName):
                 urllib.request.urlretrieve(path, fileName)
             path = fileName
+
+    if kwargs.get("strategy", None) is not None:
+        return chatRWKV.initRWKVOriginal(path, kwargs["strategy"], tokenizer)
 
     # if (kwargs.get("legacy", None) is not None):
     #     from rwkvstic.interOpLoaders.legacy import RWKV_RNN
