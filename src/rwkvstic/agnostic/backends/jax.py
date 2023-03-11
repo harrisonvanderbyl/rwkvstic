@@ -4,7 +4,7 @@ import rwkvstic.agnostic.backends.base as RWKVOp
 
 
 class RWKVNumpyOps(RWKVOp.module):
-    
+
     def __init__(self, layers, embed, *args, **kwargs):
         import numpy as np
         super().__init__(layers, embed, *args, **kwargs)
@@ -43,6 +43,7 @@ class RWKVNumpyOps(RWKVOp.module):
             return w*(xee2/x2) + b
         self.layernorm = ln
 
+
 class RWKVCuPyOps(RWKVOp.module):
     def __init__(self, layers, embed, *args, **kwargs):
         import cupy as np
@@ -53,20 +54,22 @@ class RWKVCuPyOps(RWKVOp.module):
             import numpy
             dtype = numpy.float32
             mattype = numpy.float32
-            self.initTensor = lambda x: np.array(x.float().cpu().numpy(),dtype=dtype) if len(x.squeeze().shape) ==1 else np.array(x.float().cpu().numpy(),dtype=mattype).T
-            self.initCpuTensor = lambda x: np.array(x.float().cpu().numpy(),dtype=dtype)
+            self.initTensor = lambda x: np.array(x.float().cpu().numpy(), dtype=dtype) if len(
+                x.squeeze().shape) == 1 else np.array(x.float().cpu().numpy(), dtype=mattype).T
+            self.initCpuTensor = lambda x: np.array(
+                x.float().cpu().numpy(), dtype=dtype)
             self.sqrt = np.sqrt
             self.mean = np.mean
             self.relu = lambda x: np.maximum(x, 0)
             self.exp = np.exp
             self.stack = np.stack
-            self.matvec = lambda x, y: np.matmul(y,x)
+            self.matvec = lambda x, y: np.matmul(y, x)
             self.prod = lambda x: np.prod(x, axis=1)
             self.lerp = lambda x, y, z: x*(1-z) + y*(z)
             self.minimum = lambda x, y: np.minimum(x, y)
             self.maximum = lambda x, y: np.maximum(x, y)
-            self.roll = lambda x: np.roll(x,1,axis=0)
-            self.emptyState = np.array(self.emptyState,dtype=dtype)
+            self.roll = lambda x: np.roll(x, 1, axis=0)
+            self.emptyState = np.array(self.emptyState, dtype=dtype)
             self.klimit = [18] * embed
             # module def
             self.module = object
@@ -77,26 +80,26 @@ class RWKVCuPyOps(RWKVOp.module):
             self.layerdef = lambda x: x
             self.mainfunc = lambda x: x
             def getIndex(x, y): return np.stack([x[z] for z in y])
-            self.stackEmb =  True
+            self.stackEmb = True
             self.getIndex = getIndex
             self.scatterindices = [slice(2, 5), slice(2, 4), slice(0, 2)]
             self.postProcessTensor = lambda x: x.get()
-            
+
             def ln(x, w, b):
                 xee2 = x - np.mean(x, axis=1,
-                                    keepdims=True)
+                                   keepdims=True)
 
                 x2 = np.sqrt(np.mean(np.square(xee2), axis=1,
-                            keepdims=True) + 0.000009999999747378752)
+                                     keepdims=True) + 0.000009999999747378752)
 
                 return w*(xee2/x2) + b
             self.layernorm = ln
+
             def ppm(x):
-                
+
                 mempool = np.get_default_memory_pool()
                 pinned_mempool = np.get_default_pinned_memory_pool()
 
-               
                 # You can access statistics of these memory pools.
                 print(mempool.used_bytes()/1024/1024/1024)              # 0
                 print(mempool.total_bytes()/1024/1024/1024)             # 0
@@ -104,48 +107,63 @@ class RWKVCuPyOps(RWKVOp.module):
                 return x
             self.postProcessModule = ppm
 
+
 class RWKVCuPyQuantOps(RWKVCuPyOps):
     def __init__(self, layers, embed, *args, **kwargs):
         super().__init__(layers, embed, *args, **kwargs)
         import cupy as np
+        import torch
 
         def QuantizeMatrix(x):
             rang = 255
             ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
             x = x.double()
             x = ((x-mini)/ran)
-            
-            x = np.array(x.float(), dtype=np.uint8)
+
+            x = x.float()
+
 
             return [x, np.array(ran.float()), np.array(mini.float())]
-
+        mmm = np.array([[128],[0]])
         def QuantizedMatVec(x, y):
             if len(x) != 3:
                 return y @ x
             rx, spread, zpoint = x
             yy = y*spread
+            rxx = rx
 
-            xmain = yy@rx
+            yy = yy.reshape(2, -1)
+            xmain = yy[0].matmul(
+                (rxx >> 8))
+            xmain += yy[1].matmul(
+                (rxx & 255)) 
+
+            mm = zpoint.shape
+            zpoint = zpoint.reshape(2, -1).add(mmm*spread.reshape(2, -1))
+            zpoint = zpoint.reshape(mm)
             zp = (y@zpoint).reshape(-1, 1)
             return xmain + zp
 
         def initTensor(x):
             if len(x.squeeze().shape) == 1:
                 return np.array(x.float().cpu().numpy(), dtype=np.float32)
-            
+
             splitmatrices = x.chunk(32, 1)
 
             xx = [QuantizeMatrix(x)
                   for x in splitmatrices]
-            xxo = np.concatenate([x[0] for x in xx], 1).T
+            xxo = torch.cat([x[0] for x in xx], 1).t()
+            xxo = xxo.chunk(2, 0)
+            xxo = (xxo[0]*256 + xxo[1]) - (256*128)
+            xxo = xxo.round().numpy()
+            xxo = np.array(xxo, dtype=np.int16)
             xx1 = np.concatenate([x[1] for x in xx])
             xx2 = np.concatenate([x[2] for x in xx])
-            return xxo, xx1, xx2    
+            return xxo, xx1, xx2
 
         self.initTensor = initTensor
         self.matvec = QuantizedMatVec
 
-                
 
 class RWKVJaxOps(RWKVOp.module):
     def __init__(self, layers, embed, *args, dtype=None, preJax=False, **kwargs):
