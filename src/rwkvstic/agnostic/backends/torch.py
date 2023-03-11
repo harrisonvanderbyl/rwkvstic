@@ -232,7 +232,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             rang = 255
             ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
             x = x.double()
-            x = ((x-mini)/ran)
+            x = ((x-mini)/ran).round()
             if stream:
                 x = x.to(
                     dtype=torch.uint8, non_blocking=True).pin_memory()
