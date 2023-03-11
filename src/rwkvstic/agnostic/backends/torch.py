@@ -223,11 +223,11 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 class RWKVCudaQuantOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.float32, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
+    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.float16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
         import torch
         import inquirer
         super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
-
+        mmm = torch.tensor([ [128],[0]]).to(runtimedtype).to(device=dev)
         def QuantizeMatrix(x, runtimeDtype, device, stream):
             rang = 255
             ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
@@ -250,12 +250,21 @@ class RWKVCudaQuantOps(RWKVPTOps):
             yy = y*spread
 
             yy = yy.to(dtype=dtype)
-            rxx = rx
-            rxx = torch.cat([rxx//256 + 128, rxx % 256], 0).to(dtype)
-    
 
-            xmain = yy.matmul(
-                rxx).to(dtype=runtimedtype)
+            yy = yy.chunk(2, 1)
+
+
+
+            # rxx = torch.cat([rx//256 + 128, rx % 256], 0).to(dtype)
+            rxx = (rx)
+
+            xmain = yy[0].matmul(
+                (rxx//256).to(dtype=dtype)).to(dtype=runtimedtype)
+            xmain += yy[1].matmul(
+                (rxx % 256).to(dtype=dtype)).to(dtype=runtimedtype)
+            mm = zpoint.shape
+            zpoint = zpoint.reshape(2,-1).add(mmm*spread.reshape(2,-1))
+            zpoint = zpoint.reshape(mm)
             zp = (y@zpoint).reshape(-1, 1)
             return xmain + zp
         cuda = dev
