@@ -133,9 +133,9 @@ class RWKVCuPyQuantOps(RWKVCuPyOps):
             rxx = rx
 
             yy = yy.reshape(2, -1)
-            xmain = yy[0].matmul(
+            xmain = np.matmul(yy[0]
                 (rxx >> 8))
-            xmain += yy[1].matmul(
+            xmain += np.matmul(yy[1],
                 (rxx & 255)) 
 
             mm = zpoint.shape
