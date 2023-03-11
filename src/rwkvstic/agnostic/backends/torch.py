@@ -223,7 +223,7 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 class RWKVCudaQuantOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.float16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
+    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.float32, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
         import torch
         import inquirer
         super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
@@ -233,12 +233,13 @@ class RWKVCudaQuantOps(RWKVPTOps):
             ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
             x = x.double()
             x = ((x-mini)/ran)
+            x = x.round().clamp(0, rang) 
             if stream:
                 x = x.to(
                     dtype=torch.uint8, non_blocking=True).pin_memory()
             else:
                 x = x.to(
-                    dtype=torch.uint8, non_blocking=True, device=device)
+                    dtype=torch.int32, non_blocking=True)
 
             return [x, ran.to(runtimeDtype).to(device=device), mini.to(runtimeDtype).to(device=device)]
 
@@ -249,9 +250,12 @@ class RWKVCudaQuantOps(RWKVPTOps):
             yy = y*spread
 
             yy = yy.to(dtype=dtype)
+            rxx = rx
+            rxx = torch.cat([rxx//256 + 128, rxx % 256], 0).to(dtype)
+    
 
             xmain = yy.matmul(
-                rx.to(dtype=dtype, device=y.device, non_blocking=True)).to(dtype=runtimedtype)
+                rxx).to(dtype=runtimedtype)
             zp = (y@zpoint).reshape(-1, 1)
             return xmain + zp
         cuda = dev
@@ -296,13 +300,16 @@ class RWKVCudaQuantOps(RWKVPTOps):
                 if dostream:
                     return x.to(dtype=dtype, non_blocking=True).pin_memory()
                 else:
-                    return x.to(dtype=dtype, device=dev)
+                    return x.to(dtype=dtype)
 
             splitmatrices = torch.chunk(x, chunksize, 1)
 
             xx = [QuantizeMatrix(x, runtimedtype, dev, dostream)
                   for x in splitmatrices]
             xxo = torch.cat([x[0] for x in xx], 1).t()
+            xxo = xxo.chunk(2,0)
+            xxo = (xxo[0]*256 + xxo[1]) - (256*128)
+            xxo = xxo.round().to(dtype=torch.int16 ).to(device=dev)
             xx1 = torch.cat([x[1] for x in xx])
             xx2 = torch.cat([x[2] for x in xx])
             return xxo, xx1, xx2
