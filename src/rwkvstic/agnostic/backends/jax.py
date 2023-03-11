@@ -122,9 +122,9 @@ class RWKVCuPyQuantOps(RWKVCuPyOps):
 
             x = x.float()
 
-
             return [x, np.array(ran.float()), np.array(mini.float())]
-        mmm = np.array([[128],[0]])
+        mmm = np.array([[128], [0]])
+
         def QuantizedMatVec(x, y):
             if len(x) != 3:
                 return y @ x
@@ -133,10 +133,10 @@ class RWKVCuPyQuantOps(RWKVCuPyOps):
             rxx = rx
 
             yy = yy.reshape(2, -1)
-            xmain = np.matmul(yy[0]
-                (rxx >> 8))
+            xmain = np.matmul(yy[0],
+                              (rxx >> 8))
             xmain += np.matmul(yy[1],
-                (rxx & 255)) 
+                               (rxx & 255))
 
             mm = zpoint.shape
             zpoint = zpoint.reshape(2, -1).add(mmm*spread.reshape(2, -1))
