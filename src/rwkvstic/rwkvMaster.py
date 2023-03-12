@@ -19,14 +19,13 @@ def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
         o = model.forward(m, o[1])
         progressCallBack(m)
 
-    print("loaded context in", time.time()-tt, "seconds")
-    print(o[0][0])
+    # print("loaded context in", time.time()-tt, "seconds")
+    # print(o[0][0])
     return nnewctx, o[1]
 
 
 def rnnloadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
 
-    
     for i in tqdm.tqdm(range(len(newctx))):
 
         x = ctx+newctx[:i]
@@ -38,7 +37,7 @@ def rnnloadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
 
 
 class RWKVMaster():
-    
+
     def __init__(self, model, emptyState, initTensor=lambda x: x, intTensor=lambda x: x, sampler=None, tokPath=None):
         self.model = model
 
@@ -82,7 +81,7 @@ class RWKVMaster():
 
     def loadContext(self, newctx: str = "", ctx: str = "\n\n", statex=None, progressCallBack=lambda x: x):
         statex = self.myState if statex is None else statex
-        print(newctx)
+        # print(newctx)
         ctx = self.tokenizer.encode(ctx)
         newctx = self.tokenizer.encode(newctx)
         if self.model.RnnOnly:
