@@ -223,7 +223,7 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 class RWKVCudaQuantOps(RWKVPTOps):
     import torch
 
-    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.float32, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
+    def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.bfloat16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
         import torch
         import inquirer
         super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
@@ -255,12 +255,12 @@ class RWKVCudaQuantOps(RWKVPTOps):
             yy = yy.chunk(2, 1)
 
             # rxx = torch.cat([rx//256 + 128, rx % 256], 0).to(dtype)
-            rxx = (rx).to(dtype=dtype)
+            rxx = (rx)
 
             xmain = yy[0].matmul(
-                (rxx)).to(dtype=runtimedtype) / 256
+                (rxx).to(dtype=dtype)).to(dtype=runtimedtype) / 256
             xmain += yy[1].matmul(
-                (rxx % 256)).to(dtype=runtimedtype) 
+                (rxx % 256).to(dtype=dtype)).to(dtype=runtimedtype) 
             mm = zpoint.shape
             zpoint = zpoint.reshape(2, -1).add(mmm*spread.reshape(2, -1))
             zpoint = zpoint.reshape(mm)
