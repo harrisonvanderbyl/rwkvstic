@@ -19,15 +19,15 @@ class RWKVPTOps(RWKVOp.module):
             a = inquirer.prompt(q)
             dtype = a['type']
         self.dtype = dtype
+        self.runtimedtype = kwargs.get('runtimedtype', dtype)
         # self.sample = torchsample
 
         def initTensor(x):
-            result = x.to(dtype=self.dtype)
+            if len(x.squeeze().shape) == 2:
+                return x.to(self.dtype).t()
+            else:
+                return x.to(self.runtimedtype)
 
-            if len(result.squeeze().shape) == 2:
-                result = result.t()
-
-            return result
 
         self.initTensor = initTensor
         self.intTensor = lambda x: torch.tensor(
@@ -52,7 +52,7 @@ class RWKVPTOps(RWKVOp.module):
         def lenn(x): return x.shape[0]
         self.len = lenn
         self.cat = torch.cat
-        def matvec(x, y): return torch.matmul(y, x)
+        def matvec(x, y): return torch.matmul(y.to(x.dtype), x).to(y.dtype)
         self.matvec = matvec
 
         def prod(x): return torch.prod(x, dim=1)
@@ -124,7 +124,7 @@ class RWKVPTOps(RWKVOp.module):
 
 class RWKVCudaOps(RWKVPTOps):
     def __init__(self, layers, embed, *args, useGPU=None, runtimedtype=None, dev="cuda", **kwargs):
-        super().__init__(layers, embed, *args, **kwargs)
+        super().__init__(layers, embed, *args,runtimedtype=runtimedtype, **kwargs)
         import inquirer
         import torch
 
