@@ -84,10 +84,10 @@ def AgnosticRWKV(ops: module, path):
                 w[f"blocks.{i}.att.time_mix_r"].squeeze())
 
             self.time_first = torch.nn.Parameter(
-                w[f"blocks.{i}.att.time_first"].squeeze())
+                w[f"blocks.{i}.att.time_first"].squeeze().exp())
 
             self.time_decay = torch.nn.Parameter(
-                w[f"blocks.{i}.att.time_decay"].squeeze().double().exp().neg().float())
+                w[f"blocks.{i}.att.time_decay"].squeeze().double().exp().neg().exp().float())
 
             self.ffntime_mix_k = torch.nn.Parameter(
                 w[f"blocks.{i}.ffn.time_mix_k"].squeeze())
@@ -96,7 +96,7 @@ def AgnosticRWKV(ops: module, path):
             self.attreceptance.weight = torch.nn.Parameter(
                 w[f"blocks.{i}.att.receptance.weight"])
 
-        def processLayerx(self, k, v, rz: List[torch.Tensor], state, i: int):
+        def processLayer(self, k, v, rz: List[torch.Tensor], state, i: int):
             ww = self.time_first + k[i]
             p = torch.maximum(state[4], ww)
 
@@ -127,17 +127,18 @@ def AgnosticRWKV(ops: module, path):
             rz.append(wkv)
             return rz, state
 
-        # def processLayer(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int): Mathematically identical
-        #     ki = self.exp(k[i])
-        #     wrd = self.divide(
-        #         self.add(state[2], self.multiply(self.multiply(ki, v[i]), self.exp(self.time_first[xx]))), self.add(state[3], self.multiply(ki, self.exp(self.time_first[xx]))))
+        def processLayerx(self, k, v, rz: List[torch.Tensor], state, i: int):
+            ki = k[i]
 
-        #     state = self.scatter(state, self.scatterindices[1], self.multiply(self.exp(self.time_decay[xx]), self.add(
-        #         state[2:4], self.stack((self.multiply(
-        #             v[i], ki), ki)))))
+            state[2:4] = state[2:4] + torch.stack(
+                (v[i], k[i]))
 
-        #     rz = self.arrayPush(rz, wrd, i)
-        #     return rz, state
+            # state[2:4] *= self.time_decay
+
+            rz.append(state[2].clone())
+            rz.append(state[3].clone())
+
+            return rz, state
 
         def forward(self, x, state):
 
@@ -150,7 +151,7 @@ def AgnosticRWKV(ops: module, path):
 
             km = torch.lerp(tc, xy, self.atttime_mix_k)
 
-            k = self.attkey(km)
+            k = self.attkey(km).exp()
 
             vm = torch.lerp(tc, xy, self.atttime_mix_v)
 
@@ -162,10 +163,27 @@ def AgnosticRWKV(ops: module, path):
 
             rz = []
 
-            for i in range(len(k)):
-                rz, state = self.processLayerx(k, v, rz, state, i)
+            vx = k * v * \
+                self.time_decay.pow(
+                    1+len(k)-torch.arange(len(k)).cuda().unsqueeze(0).t())
 
-            rz = self.attout(torch.stack(rz)*r) + x
+            kx = k * \
+                self.time_decay.pow(
+                    1+len(k)-torch.arange(len(k)).cuda().unsqueeze(0).t())
+
+            vx[0] += state[2]
+            kx[0] += state[3]
+
+            # for i in range(len(k)):
+            #     rz, state = self.processLayerx(
+            #         kx, v, rz, state, i)
+            rza = vx.cumsum(0)
+            rzb = kx.cumsum(0)
+            state[2:4] = torch.stack((rza[-1], rzb[-1]))
+            rz = (rza + k * self.time_first * v) / \
+                (rzb + k * self.time_first)
+
+            rz = self.attout(rz*r) + x
 
             ddd = self.ln2(rz)
 
@@ -241,12 +259,15 @@ def AgnosticRWKV(ops: module, path):
 
             x = self.ln_out(x)
 
-            outx = self.head(x)
+            outx = self.head(x)[-1].detach()
 
             return outx, state
     myrwkv = myRWKV(768, 12, 50277)
 
     myrwkv.loadFromBlinkDLCheckpoint(path)
+
     myrwkv.eval()
+
     returnObject: myRWKV = myrwkv
+
     return returnObject
