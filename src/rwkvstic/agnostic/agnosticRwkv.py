@@ -5,7 +5,7 @@ import torch
 
 def AgnosticRWKV(ops: module, path):
 
-    device = "cuda"
+    device = "cpu" if not ops.useGPU else "cuda"
     dtype = torch.float32
 
     class Block(torch.nn.Module):
@@ -231,7 +231,7 @@ def AgnosticRWKV(ops: module, path):
                     self.blocks[i].loadFromBlinkDLCheckpoint(w, i)
 
         def forward(self, x, state):
-            x = self.emb(x.cuda())
+            x = self.emb(x)
             x = self.ln_in(x)
 
             for i, block in enumerate(self.blocks):
@@ -241,12 +241,13 @@ def AgnosticRWKV(ops: module, path):
 
             x = self.ln_out(x)
 
-            outx = self.head(x)
+            outx = self.head(x)[-1].detach().cpu()
 
             return outx, state
-    myrwkv = myRWKV(768, 12, 50277)
+    with torch.no_grad():
+        myrwkv = myRWKV(768, 12, 50277)
 
-    myrwkv.loadFromBlinkDLCheckpoint(path)
+        myrwkv.loadFromBlinkDLCheckpoint(path)
     myrwkv.eval()
     returnObject: myRWKV = myrwkv
     return returnObject
