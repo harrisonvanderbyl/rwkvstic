@@ -4,175 +4,212 @@ import torch
 
 
 def AgnosticRWKV(ops: module, *args):
-    class myRWKV(ops.module):
 
-        @ ops.initfunc
-        def __init__(self, w: Dict[str, ops.TensorType]):
+    class Block(torch.nn.Module):
+        def __init__(self, w, i):
+            super(Block, self).__init__()
+
+            self.ln1 = torch.nn.LayerNorm(
+                w[f"blocks.{i}.ln1.weight"].shape, device="cuda", dtype=ops.runtimedtype)
+            self.ln2 = torch.nn.LayerNorm(
+                w[f"blocks.{i}.ln2.weight"].shape, device="cuda", dtype=ops.runtimedtype)
+
+            self.ln1.weight = torch.nn.Parameter(w[f"blocks.{i}.ln1.weight"])
+            self.ln1.bias = torch.nn.Parameter(w[f"blocks.{i}.ln1.bias"])
+            self.ln2.weight = torch.nn.Parameter(w[f"blocks.{i}.ln2.weight"])
+            self.ln2.bias = torch.nn.Parameter(w[f"blocks.{i}.ln2.bias"])
+
+            self.attkey = torch.nn.Linear(
+                w[f"blocks.{i}.att.key.weight"].shape[0], w[f"blocks.{i}.att.key.weight"].shape[1], device="cuda")
+            self.attkey.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.att.key.weight"].t())
+            self.attvalue = torch.nn.Linear(
+                w[f"blocks.{i}.att.value.weight"].shape[0], w[f"blocks.{i}.att.value.weight"].shape[1], device="cuda")
+            self.attvalue.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.att.value.weight"].t())
+            self.attreceptance = torch.nn.Linear(
+                w[f"blocks.{i}.att.receptance.weight"].shape[0], w[f"blocks.{i}.att.receptance.weight"].shape[1], device="cuda")
+            self.attreceptance.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.att.receptance.weight"].t())
+
+            self.atttime_mix_k = torch.nn.Parameter(
+                w[f"blocks.{i}.att.time_mix_k"])
+            self.atttime_mix_v = torch.nn.Parameter(
+                w[f"blocks.{i}.att.time_mix_v"])
+            self.atttime_mix_r = torch.nn.Parameter(
+                w[f"blocks.{i}.att.time_mix_r"])
+
+            self.time_first = torch.nn.Parameter(
+                w[f"blocks.{i}.att.time_first"])
+
+            self.time_decay = torch.nn.Parameter(
+                w[f"blocks.{i}.att.time_decay"])
+
+            self.ffntime_mix_k = torch.nn.Parameter(
+                w[f"blocks.{i}.ffn.time_mix_k"])
+            self.ffntime_mix_r = torch.nn.Parameter(
+                w[f"blocks.{i}.ffn.time_mix_r"])
+
+            self.ffnkey = torch.nn.Linear(
+                w[f"blocks.{i}.ffn.key.weight"].shape[0], w[f"blocks.{i}.ffn.key.weight"].shape[1], device="cuda")
+            self.ffnkey.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.ffn.key.weight"].t())
+            self.ffnvalue = torch.nn.Linear(
+                w[f"blocks.{i}.ffn.value.weight"].shape[0], w[f"blocks.{i}.ffn.value.weight"].shape[1], device="cuda")
+            self.ffnvalue.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.ffn.value.weight"].t())
+            self.ffnreceptance = torch.nn.Linear(
+                w[f"blocks.{i}.ffn.receptance.weight"].shape[0], w[f"blocks.{i}.ffn.receptance.weight"].shape[1], device="cuda")
+            self.ffnreceptance.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.ffn.receptance.weight"].t())
+
+            self.attout = torch.nn.Linear(
+                w[f"blocks.{i}.att.output.weight"].shape[0], w[f"blocks.{i}.att.output.weight"].shape[1], device="cuda")
+            self.attout.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.att.output.weight"].t())
+
+        def processLayerx(self, k, v, rz: List[torch.Tensor], state, i):
+            ww = self.time_first + k[i]
+            p = torch.maximum(state[4], ww)
+
+            e1 = (state[4] - p).exp()
+
+            e2 = (ww - p).exp()
+
+            a = e1 * (state[2]) + e2 * v[i]
+
+            b = e1 * (state[3]) + e2
+
+            wwn = state[4] + self.time_decay
+
+            p1 = torch.maximum(wwn, k[i])
+
+            e11 = (wwn - p1).exp()
+
+            e21 = (k[i] - p1).exp()
+
+            outb = e11 * state[2] + e21 * v[i]
+
+            outc = e11 * state[3] + e21
+
+            state[2:5] = torch.stack((outb, outc, p1))
+
+            wkv = a / b
+
+            rz.append(wkv)
+            return rz, state
+
+        def forward(self, x, state):
+
+            xy = self.ln1(x)
+
+            tc = xy.roll(1, 0)
+            rmc = xy[-1]
+            tc[0] = state[0]
+            state[0] = rmc
+
+            km = torch.lerp(tc, xy, self.atttime_mix_k)
+
+            k = self.attkey(km)
+
+            vm = torch.lerp(tc, xy, self.atttime_mix_v)
+
+            v = self.attvalue(vm)
+
+            rm = torch.lerp(tc, xy, self.atttime_mix_r)
+
+            r = self.attreceptance(rm).sigmoid()
+
+            rz = []
+
+            for i in range(len(k)):
+                rz, state = self.processLayerx(k, v, rz, state, i)
+
+            rz = self.attout(torch.stack(rz)*r) + x
+
+            ddd = self.ln2(rz)
+
+            rc = ddd.roll(1, 0)
+            dc = ddd[-1]
+            rc[0] = state[1]
+            state[1] = dc
+
+            kmr = torch.lerp(rc, ddd, self.ffntime_mix_k)
+
+            kf = self.ffnkey(kmr).relu()
+
+            rmr = torch.lerp(rc, ddd, self.ffntime_mix_r)
+
+            rf = self.ffnreceptance(rmr).sigmoid()
+
+            rvm = self.ffnvalue(torch.square(kf))
+
+            out = rvm * rf + rz
+
+            return out, state
+
+            # stuff
+
+    class myRWKV(torch.nn.Module):
+
+        def __init__(self, w):
             super(myRWKV, self).__init__()
             print("Legacy RWKV")
 
             for x in ops.__dict__.keys():
                 self.__dict__[x] = ops.__dict__[x]
-            self.postprocess0: ops.VectorType = (w["ln_out.weight"])
-            self.postprocess1: ops.VectorType = (w["ln_out.bias"])
-            self.postprocess2: ops.VectorType = (w["head.weight"])
-            self.emb: ops.MatrixType = w["emb.weight"]
-            self.emb1: ops.VectorType = w["blocks.0.ln0.weight"]
-            self.emb2: ops.VectorType = w["blocks.0.ln0.bias"]
-            self.ln1w: ops.VectorType = ops.mnstack(
-                [w[f"blocks.{x}.ln1.weight"] for x in range(ops.n_layers)])
-            self.ln1b: ops.VectorType = ops.mnstack(
-                [w[f"blocks.{x}.ln1.bias"] for x in range(ops.n_layers)])
-            self.ln2w: ops.VectorType = ops.mnstack(
-                [w[f"blocks.{x}.ln2.weight"] for x in range(ops.n_layers)])
-            self.ln2b: ops.VectorType = ops.mnstack(
-                [w[f"blocks.{x}.ln2.bias"] for x in range(ops.n_layers)])
-            self.time_decay: ops.VectorType = ops.mnstack([
-                w[f"blocks.{x}.att.time_decay"] for x in range(ops.n_layers)])
-            self.time_first: ops.VectorType = ops.mnstack([
-                w[f"blocks.{x}.att.time_first"] for x in range(ops.n_layers)])
-            self.kktk: ops.VectorType = ops.mnstack(
-                [w[f"blocks.{x}.att.time_mix_k"] for x in range(ops.n_layers)])
-            self.vvtv: ops.VectorType = ops.mnstack(
-                [w[f"blocks.{x}.att.time_mix_v"] for x in range(ops.n_layers)])
-            self.rrtr: ops.VectorType = ops.mnstack(
-                [w[f"blocks.{x}.att.time_mix_r"] for x in range(ops.n_layers)])
-            self.key: ops.MatrixType = ops.mnstack(
-                [w[f"blocks.{x}.att.key.weight"] for x in range(ops.n_layers)])
-            self.value: ops.MatrixType = ops.mnstack(
-                [w[f"blocks.{x}.att.value.weight"] for x in range(ops.n_layers)])
-            self.receptance: ops.MatrixType = ops.mnstack([
-                w[f"blocks.{x}.att.receptance.weight"] for x in range(ops.n_layers)])
-            self.outputvv: ops.MatrixType = ops.mnstack([
-                w[f"blocks.{x}.att.output.weight"] for x in range(ops.n_layers)])
-            self.time_mix_k_ffn: ops.VectorType = ops.mnstack([
-                w[f"blocks.{x}.ffn.time_mix_k"] for x in range(ops.n_layers)])
-            self.time_mix_r_ffn: ops.VectorType = ops.mnstack([
-                w[f"blocks.{x}.ffn.time_mix_r"] for x in range(ops.n_layers)])
-            self.key_ffn: ops.MatrixType = ops.mnstack(
-                [w[f"blocks.{x}.ffn.key.weight"] for x in range(ops.n_layers)])
-            self.receptance_ffn: ops.MatrixType = ops.mnstack([
-                w[f"blocks.{x}.ffn.receptance.weight"] for x in range(ops.n_layers)])
-            self.value_ffn: ops.MatrixType = ops.mnstack([
-                w[f"blocks.{x}.ffn.value.weight"] for x in range(ops.n_layers)])
 
-            if ops.useLogFix:
-                self.processLayer = self.processLayerx
+            self.head = torch.nn.Linear(
+                w["head.weight"].shape[0], w["head.weight"].shape[1], device="cuda")
+            self.head.weight = torch.nn.Parameter(w["head.weight"].t())
 
-        def processLayerx(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
-            ww = self.time_first[xx] + k[i]
-            p = self.maximum(state[4], ww)
+            self.emb = torch.nn.Embedding(
+                w["emb.weight"].shape[0], w["emb.weight"].shape[1])
+            self.ln_out = torch.nn.LayerNorm(
+                w["ln_out.weight"].shape, device="cuda", dtype=ops.runtimedtype)
+            self.ln_in = torch.nn.LayerNorm(
+                w["blocks.0.ln0.weight"].shape, device="cuda", dtype=ops.runtimedtype)
 
-            e1 = self.exp(self.subtract((state[4]), p))
+            self.ln_in.weight = torch.nn.Parameter(w["blocks.0.ln0.weight"])
+            self.ln_in.bias = torch.nn.Parameter(w["blocks.0.ln0.bias"])
 
-            e2 = self.exp(self.subtract(ww, p))
+            self.ln_out.weight = torch.nn.Parameter(w["ln_out.weight"])
+            self.ln_out.bias = torch.nn.Parameter(w["ln_out.bias"])
 
-            a = self.add(self.multiply(e1, (state[2])),
-                         self.multiply(e2, v[i]))
+            blocks = []
+            for i in range(ops.n_layers):
+                blocks.append(Block(w, i))
 
-            b = self.add(self.multiply(
-                e1, (state[3])), e2)
+            self.blocks = torch.nn.ModuleList(blocks)
 
-            wwn = self.add((
-                state[4]), self.time_decay[xx])
+            self.emb.weight = torch.nn.Parameter(w["emb.weight"])
 
-            p1 = self.maximum(wwn, k[i])
+        # def processLayer(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
+        #     ki = self.exp(k[i])
+        #     wrd = self.divide(
+        #         self.add(state[2], self.multiply(self.multiply(ki, v[i]), self.exp(self.time_first[xx]))), self.add(state[3], self.multiply(ki, self.exp(self.time_first[xx]))))
 
-            e11 = self.exp(self.subtract(wwn, p1))
+        #     state = self.scatter(state, self.scatterindices[1], self.multiply(self.exp(self.time_decay[xx]), self.add(
+        #         state[2:4], self.stack((self.multiply(
+        #             v[i], ki), ki)))))
 
-            e21 = self.exp(self.subtract(k[i], p1))
+        #     rz = self.arrayPush(rz, wrd, i)
+        #     return rz, state
 
-            outb = self.add(self.multiply(e11, (state[2])),
-                            self.multiply(e21, v[i]))
-
-            outc = self.add(self.multiply(
-                e11, (state[3])), e21)
-
-            # state[2:5] = ops.stack((outb, outc, p1))
-
-            state = self.scatter(state, self.scatterindices[0], self.stack(
-                (outb, outc, p1)))
-            wkv = self.divide(a, b)
-            rz = self.arrayPush(rz, wkv, i)
-            return rz, state
-
-        def processLayer(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
-            ki = self.exp(k[i])
-            wrd = self.divide(
-                self.add(state[2], self.multiply(self.multiply(ki, v[i]), self.exp(self.time_first[xx]))), self.add(state[3], self.multiply(ki, self.exp(self.time_first[xx]))))
-
-            state = self.scatter(state, self.scatterindices[1], self.multiply(self.exp(self.time_decay[xx]), self.add(
-                state[2:4], self.stack((self.multiply(
-                    v[i], ki), ki)))))
-
-            rz = self.arrayPush(rz, wrd, i)
-            return rz, state
-
-        @ ops.layerdef
-        def doLayer(self, x, state, xx: int):
-
-            xy = self.layernorm(x, self.ln1w[xx], self.ln1b[xx])
-
-            tc = self.push(self.roll(xy),  state[0])
-
-            k = self.matvec(
-                self.key[xx], self.lerp(tc, xy, self.kktk[xx]))
-
-            v = self.matvec(self.value[xx], self.lerp(
-                tc, xy, self.vvtv[xx]))
-
-            rr = self.matvec(
-                self.receptance[xx], self.lerp(tc, xy, self.rrtr[xx]))
-
-            r = self.logistical(rr)
-
-            rz = self.emptyarray(self.len(x))
-
-            for i in self.rng(self.len(x)):
-
-                rz, state = self.processLayer(k, v, rz, state, xx, i)
-
-            mvv = self.add(x, self.matvec(
-                self.outputvv[xx], self.multiply(r, self.stack(rz))))
-
-            ddd = self.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
-
-            rc = self.push(self.roll(ddd), state[1])
-            # self.arrayPush(state, xy[-1], 0)
-            # self.arrayPush(state, ddd[-1], 1)
-            state = self.scatter(state, self.scatterindices[2], self.stack(
-                (xy[-1], ddd[-1])))
-
-            km = self.relu(self.matvec(self.key_ffn[xx], self.lerp(
-                rc, ddd, self.time_mix_k_ffn[xx])))
-
-            rt = self.logistical((self.matvec(self.receptance_ffn[xx], self.lerp(
-                rc, ddd, self.time_mix_r_ffn[xx]))))
-
-            rvm = self.matvec(self.value_ffn[xx], self.multiply(km, km))
-
-            x = self.add(mvv, self.multiply(
-                rvm, rt))
-
-            return x,  state
-
-        @ ops.mainfunc
         def forward(self, x, state):
-            g = self.getIndex(self.emb, x)
-            x = self.layernorm(
-                self.processEmbed(g),
-                self.emb1, self.emb2)
+            x = self.emb(x).cuda()
+            x = self.ln_in(x)
 
-            for i in self.rng(self.len(state)):
+            for i in range(len(self.blocks)):
 
-                x, rstate = self.doLayer(
-                    x, state[i], i)
-                state = self.scatter(state, i, rstate)
+                x, rstate = self.blocks[i](x, state[i])
+                state[i] = rstate
 
-            x = self.matvec(self.postprocess2, self.layernorm(x, self.postprocess0,
-                                                              self.postprocess1))
+            x = self.ln_out(x)
 
-            return self.postProcessTensor(self.pop(x)), state
+            outx = self.head(x)
+
+            return outx[-1].detach(), state
 
         # for keras stuff, ignore this if you are not using keras
         def call(self, *args, **kwds):
