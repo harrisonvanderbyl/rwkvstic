@@ -28,7 +28,6 @@ class RWKVPTOps(RWKVOp.module):
             else:
                 return x.to(self.runtimedtype)
 
-
         self.initTensor = initTensor
         self.intTensor = lambda x: torch.tensor(
             x if isinstance(x, list) else [x], dtype=torch.int64)
@@ -112,7 +111,8 @@ class RWKVPTOps(RWKVOp.module):
             # return torch.nn.functional.layer_norm(x, x.shape, w.expand(x.shape), b.expand(x.shape))
 
         self.layernorm = ln
-        self.emptyState = torch.tensor(self.emptyState, dtype=self.dtype)
+        self.emptyState = torch.tensor(
+            self.emptyState, dtype=self.runtimedtype)
         self.stackEmb = True
         self.TensorType = torch.Tensor
         self.MatrixType = torch.Tensor
@@ -124,7 +124,7 @@ class RWKVPTOps(RWKVOp.module):
 
 class RWKVCudaOps(RWKVPTOps):
     def __init__(self, layers, embed, *args, useGPU=None, runtimedtype=None, dev="cuda", **kwargs):
-        super().__init__(layers, embed, *args,runtimedtype=runtimedtype, **kwargs)
+        super().__init__(layers, embed, *args, runtimedtype=runtimedtype, **kwargs)
         import inquirer
         import torch
 
