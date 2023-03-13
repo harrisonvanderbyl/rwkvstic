@@ -243,7 +243,7 @@ def AgnosticRWKV(ops: module, path):
 
             outx = self.head(x)
 
-            return outx[-1].detach(), state
+            return outx, state
     myrwkv = myRWKV(768, 12, 50277)
 
     myrwkv.loadFromBlinkDLCheckpoint(path)
