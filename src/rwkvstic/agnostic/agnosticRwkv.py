@@ -3,72 +3,100 @@ from typing import Dict, List
 import torch
 
 
-def AgnosticRWKV(ops: module, *args):
+def AgnosticRWKV(ops: module, path):
+
+    device = "cuda"
+    dtype = torch.float32
 
     class Block(torch.nn.Module):
-        def __init__(self, w, i):
+        def __init__(self, dims):
             super(Block, self).__init__()
 
             self.ln1 = torch.nn.LayerNorm(
-                w[f"blocks.{i}.ln1.weight"].shape, device="cuda", dtype=ops.runtimedtype)
+                (dims,), device=device, dtype=dtype)
             self.ln2 = torch.nn.LayerNorm(
-                w[f"blocks.{i}.ln2.weight"].shape, device="cuda", dtype=ops.runtimedtype)
+                dims, device=device, dtype=dtype)
 
+            self.attkey = torch.nn.Linear(
+                dims, dims, device=device)
+
+            self.attvalue = torch.nn.Linear(
+                dims, dims, device=device)
+
+            self.attreceptance = torch.nn.Linear(
+                dims, dims, device=device)
+
+            self.atttime_mix_k = torch.nn.Parameter(
+                torch.zeros(dims))
+            self.atttime_mix_v = torch.nn.Parameter(
+                torch.zeros(dims))
+            self.atttime_mix_r = torch.nn.Parameter(
+                torch.zeros(dims))
+
+            self.time_first = torch.nn.Parameter(
+                torch.zeros(dims))
+
+            self.time_decay = torch.nn.Parameter(
+                torch.zeros(dims))
+
+            self.ffntime_mix_k = torch.nn.Parameter(
+                torch.zeros(dims))
+            self.ffntime_mix_r = torch.nn.Parameter(
+                torch.zeros(dims))
+
+            self.ffnkey = torch.nn.Linear(
+                dims, dims*4, device=device)
+
+            self.ffnvalue = torch.nn.Linear(
+                dims, dims, device=device)
+
+            self.ffnreceptance = torch.nn.Linear(
+                dims, dims, device=device)
+
+            self.attout = torch.nn.Linear(
+                dims, dims, device=device)
+
+        def loadFromBlinkDLCheckpoint(self, w, i):
             self.ln1.weight = torch.nn.Parameter(w[f"blocks.{i}.ln1.weight"])
             self.ln1.bias = torch.nn.Parameter(w[f"blocks.{i}.ln1.bias"])
             self.ln2.weight = torch.nn.Parameter(w[f"blocks.{i}.ln2.weight"])
             self.ln2.bias = torch.nn.Parameter(w[f"blocks.{i}.ln2.bias"])
-
-            self.attkey = torch.nn.Linear(
-                w[f"blocks.{i}.att.key.weight"].shape[0], w[f"blocks.{i}.att.key.weight"].shape[1], device="cuda")
             self.attkey.weight = torch.nn.Parameter(
-                w[f"blocks.{i}.att.key.weight"].t())
-            self.attvalue = torch.nn.Linear(
-                w[f"blocks.{i}.att.value.weight"].shape[0], w[f"blocks.{i}.att.value.weight"].shape[1], device="cuda")
+                w[f"blocks.{i}.att.key.weight"])
             self.attvalue.weight = torch.nn.Parameter(
-                w[f"blocks.{i}.att.value.weight"].t())
-            self.attreceptance = torch.nn.Linear(
-                w[f"blocks.{i}.att.receptance.weight"].shape[0], w[f"blocks.{i}.att.receptance.weight"].shape[1], device="cuda")
+                w[f"blocks.{i}.att.value.weight"])
+            self.ffnkey.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.ffn.key.weight"])
+            self.ffnvalue.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.ffn.value.weight"])
+            self.attout.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.att.output.weight"])
+            self.ffnreceptance.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.ffn.receptance.weight"])
             self.attreceptance.weight = torch.nn.Parameter(
-                w[f"blocks.{i}.att.receptance.weight"].t())
+                w[f"blocks.{i}.att.receptance.weight"])
 
             self.atttime_mix_k = torch.nn.Parameter(
-                w[f"blocks.{i}.att.time_mix_k"])
+                w[f"blocks.{i}.att.time_mix_k"].squeeze())
             self.atttime_mix_v = torch.nn.Parameter(
-                w[f"blocks.{i}.att.time_mix_v"])
+                w[f"blocks.{i}.att.time_mix_v"].squeeze())
             self.atttime_mix_r = torch.nn.Parameter(
-                w[f"blocks.{i}.att.time_mix_r"])
+                w[f"blocks.{i}.att.time_mix_r"].squeeze())
 
             self.time_first = torch.nn.Parameter(
-                w[f"blocks.{i}.att.time_first"])
+                w[f"blocks.{i}.att.time_first"].squeeze())
 
             self.time_decay = torch.nn.Parameter(
-                w[f"blocks.{i}.att.time_decay"])
+                w[f"blocks.{i}.att.time_decay"].squeeze().double().exp().neg().float())
 
             self.ffntime_mix_k = torch.nn.Parameter(
-                w[f"blocks.{i}.ffn.time_mix_k"])
+                w[f"blocks.{i}.ffn.time_mix_k"].squeeze())
             self.ffntime_mix_r = torch.nn.Parameter(
-                w[f"blocks.{i}.ffn.time_mix_r"])
+                w[f"blocks.{i}.ffn.time_mix_r"].squeeze())
+            self.attreceptance.weight = torch.nn.Parameter(
+                w[f"blocks.{i}.att.receptance.weight"])
 
-            self.ffnkey = torch.nn.Linear(
-                w[f"blocks.{i}.ffn.key.weight"].shape[0], w[f"blocks.{i}.ffn.key.weight"].shape[1], device="cuda")
-            self.ffnkey.weight = torch.nn.Parameter(
-                w[f"blocks.{i}.ffn.key.weight"].t())
-            self.ffnvalue = torch.nn.Linear(
-                w[f"blocks.{i}.ffn.value.weight"].shape[0], w[f"blocks.{i}.ffn.value.weight"].shape[1], device="cuda")
-            self.ffnvalue.weight = torch.nn.Parameter(
-                w[f"blocks.{i}.ffn.value.weight"].t())
-            self.ffnreceptance = torch.nn.Linear(
-                w[f"blocks.{i}.ffn.receptance.weight"].shape[0], w[f"blocks.{i}.ffn.receptance.weight"].shape[1], device="cuda")
-            self.ffnreceptance.weight = torch.nn.Parameter(
-                w[f"blocks.{i}.ffn.receptance.weight"].t())
-
-            self.attout = torch.nn.Linear(
-                w[f"blocks.{i}.att.output.weight"].shape[0], w[f"blocks.{i}.att.output.weight"].shape[1], device="cuda")
-            self.attout.weight = torch.nn.Parameter(
-                w[f"blocks.{i}.att.output.weight"].t())
-
-        def processLayerx(self, k, v, rz: List[torch.Tensor], state, i):
+        def processLayerx(self, k, v, rz: List[torch.Tensor], state, i: int):
             ww = self.time_first + k[i]
             p = torch.maximum(state[4], ww)
 
@@ -98,6 +126,18 @@ def AgnosticRWKV(ops: module, *args):
 
             rz.append(wkv)
             return rz, state
+
+        # def processLayer(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int): Mathematically identical
+        #     ki = self.exp(k[i])
+        #     wrd = self.divide(
+        #         self.add(state[2], self.multiply(self.multiply(ki, v[i]), self.exp(self.time_first[xx]))), self.add(state[3], self.multiply(ki, self.exp(self.time_first[xx]))))
+
+        #     state = self.scatter(state, self.scatterindices[1], self.multiply(self.exp(self.time_decay[xx]), self.add(
+        #         state[2:4], self.stack((self.multiply(
+        #             v[i], ki), ki)))))
+
+        #     rz = self.arrayPush(rz, wrd, i)
+        #     return rz, state
 
         def forward(self, x, state):
 
@@ -152,57 +192,51 @@ def AgnosticRWKV(ops: module, *args):
 
     class myRWKV(torch.nn.Module):
 
-        def __init__(self, w):
+        def __init__(self, dims, layers, head):
             super(myRWKV, self).__init__()
             print("Legacy RWKV")
+            with torch.no_grad():
+                for x in ops.__dict__.keys():
+                    self.__dict__[x] = ops.__dict__[x]
 
-            for x in ops.__dict__.keys():
-                self.__dict__[x] = ops.__dict__[x]
+                self.head = torch.nn.Linear(
+                    dims, head, device=device)
 
-            self.head = torch.nn.Linear(
-                w["head.weight"].shape[0], w["head.weight"].shape[1], device="cuda")
-            self.head.weight = torch.nn.Parameter(w["head.weight"].t())
+                self.emb = torch.nn.Embedding(
+                    head, dims)
+                self.ln_out = torch.nn.LayerNorm(
+                    dims, device=device, dtype=dtype)
+                self.ln_in = torch.nn.LayerNorm(
+                    dims, device=device, dtype=dtype)
 
-            self.emb = torch.nn.Embedding(
-                w["emb.weight"].shape[0], w["emb.weight"].shape[1])
-            self.ln_out = torch.nn.LayerNorm(
-                w["ln_out.weight"].shape, device="cuda", dtype=ops.runtimedtype)
-            self.ln_in = torch.nn.LayerNorm(
-                w["blocks.0.ln0.weight"].shape, device="cuda", dtype=ops.runtimedtype)
+                blocks = []
+                for i in range(layers):
+                    blocks.append(Block(dims))
 
-            self.ln_in.weight = torch.nn.Parameter(w["blocks.0.ln0.weight"])
-            self.ln_in.bias = torch.nn.Parameter(w["blocks.0.ln0.bias"])
+                self.blocks = torch.nn.ModuleList(blocks)
 
-            self.ln_out.weight = torch.nn.Parameter(w["ln_out.weight"])
-            self.ln_out.bias = torch.nn.Parameter(w["ln_out.bias"])
+        def loadFromBlinkDLCheckpoint(self, path):
+            w = torch.load(path, map_location=device)
+            with torch.no_grad():
+                self.head.weight = torch.nn.Parameter(w["head.weight"])
+                self.ln_in.bias = torch.nn.Parameter(w["blocks.0.ln0.bias"])
+                self.ln_in.weight = torch.nn.Parameter(
+                    w["blocks.0.ln0.weight"])
 
-            blocks = []
-            for i in range(ops.n_layers):
-                blocks.append(Block(w, i))
+                self.ln_out.weight = torch.nn.Parameter(w["ln_out.weight"])
+                self.ln_out.bias = torch.nn.Parameter(w["ln_out.bias"])
+                self.emb.weight = torch.nn.Parameter(w["emb.weight"])
 
-            self.blocks = torch.nn.ModuleList(blocks)
-
-            self.emb.weight = torch.nn.Parameter(w["emb.weight"])
-
-        # def processLayer(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
-        #     ki = self.exp(k[i])
-        #     wrd = self.divide(
-        #         self.add(state[2], self.multiply(self.multiply(ki, v[i]), self.exp(self.time_first[xx]))), self.add(state[3], self.multiply(ki, self.exp(self.time_first[xx]))))
-
-        #     state = self.scatter(state, self.scatterindices[1], self.multiply(self.exp(self.time_decay[xx]), self.add(
-        #         state[2:4], self.stack((self.multiply(
-        #             v[i], ki), ki)))))
-
-        #     rz = self.arrayPush(rz, wrd, i)
-        #     return rz, state
+                for i in range(len(self.blocks)):
+                    self.blocks[i].loadFromBlinkDLCheckpoint(w, i)
 
         def forward(self, x, state):
-            x = self.emb(x).cuda()
+            x = self.emb(x.cuda())
             x = self.ln_in(x)
 
-            for i in range(len(self.blocks)):
+            for i, block in enumerate(self.blocks):
 
-                x, rstate = self.blocks[i](x, state[i])
+                x, rstate = block(x, state[i])
                 state[i] = rstate
 
             x = self.ln_out(x)
@@ -210,10 +244,9 @@ def AgnosticRWKV(ops: module, *args):
             outx = self.head(x)
 
             return outx[-1].detach(), state
+    myrwkv = myRWKV(768, 12, 50277)
 
-        # for keras stuff, ignore this if you are not using keras
-        def call(self, *args, **kwds):
-            del kwds["training"]
-            return self.forward(*args, **kwds)
-    returnObject: myRWKV = ops.postProcessModule(myRWKV(*args))
+    myrwkv.loadFromBlinkDLCheckpoint(path)
+    myrwkv.eval()
+    returnObject: myRWKV = myrwkv
     return returnObject

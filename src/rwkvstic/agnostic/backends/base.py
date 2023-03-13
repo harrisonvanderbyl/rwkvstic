@@ -108,6 +108,7 @@ class module:
         self.scatterindices = [slice(2, 5), slice(2, 4), slice(0, 2)]
 
         self.scatter = scatter
+        self.embed = embed
 
 
 class rnnmodule:
