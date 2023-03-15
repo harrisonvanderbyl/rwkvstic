@@ -3,9 +3,20 @@ from typing import Dict, List
 import torch
 
 
+def powerTri(t, p):
+    t = t.expand(p, p, -1)
+
+    tri = ((torch.arange(p).expand(p, p)+1).t() -
+           torch.arange(p)).tril().unsqueeze(-1)
+
+    mask = torch.ones(p, p).tril().unsqueeze(-1)
+
+    return t.pow(tri)*mask
+
+
 def AgnosticRWKV(ops: module, path):
 
-    device = "cuda"
+    device = "cpu"
     dtype = torch.float32
 
     class Block(torch.nn.Module):
@@ -130,8 +141,8 @@ def AgnosticRWKV(ops: module, path):
         def processLayerx(self, k, v, rz: List[torch.Tensor], state, i: int):
             ki = k[i]
 
-            state[2:4] = state[2:4] + torch.stack(
-                (v[i], k[i]))
+            state[2:4] = (state[2:4] + torch.stack(
+                (v[i], k[i])))*self.time_decay
 
             # state[2:4] *= self.time_decay
 
@@ -151,7 +162,7 @@ def AgnosticRWKV(ops: module, path):
 
             km = torch.lerp(tc, xy, self.atttime_mix_k)
 
-            k = self.attkey(km).exp()
+            k = self.attkey(km)
 
             vm = torch.lerp(tc, xy, self.atttime_mix_v)
 
@@ -163,23 +174,22 @@ def AgnosticRWKV(ops: module, path):
 
             rz = []
 
-            vx = k * v * \
-                self.time_decay.pow(
-                    1+len(k)-torch.arange(len(k)).cuda().unsqueeze(0).t())
+            k = k.exp()
 
-            kx = k * \
-                self.time_decay.pow(
-                    1+len(k)-torch.arange(len(k)).cuda().unsqueeze(0).t())
+            vx = k * v
+
+            kx = k
+
+            t = powerTri(self.time_decay, k.shape[0])
 
             vx[0] += state[2]
             kx[0] += state[3]
+            
+            rza = (vx*t).sum(1)
+            rzb = (kx*t).sum(1)
 
-            # for i in range(len(k)):
-            #     rz, state = self.processLayerx(
-            #         kx, v, rz, state, i)
-            rza = vx.cumsum(0)
-            rzb = kx.cumsum(0)
             state[2:4] = torch.stack((rza[-1], rzb[-1]))
+
             rz = (rza + k * self.time_first * v) / \
                 (rzb + k * self.time_first)
 
@@ -249,7 +259,7 @@ def AgnosticRWKV(ops: module, path):
                     self.blocks[i].loadFromBlinkDLCheckpoint(w, i)
 
         def forward(self, x, state):
-            x = self.emb(x.cuda())
+            x = self.emb(x)
             x = self.ln_in(x)
 
             for i, block in enumerate(self.blocks):
