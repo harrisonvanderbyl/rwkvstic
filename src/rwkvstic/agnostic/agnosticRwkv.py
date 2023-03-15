@@ -96,36 +96,36 @@ def AgnosticRWKV(ops: module, path):
             self.attreceptance.weight = torch.nn.Parameter(
                 w[f"blocks.{i}.att.receptance.weight"])
 
-        def processLayer(self, k, v, rz: List[torch.Tensor], state, i: int):
-            ww = self.time_first + k[i]
-            p = torch.maximum(state[4], ww)
+        # def processLayer(self, k, v, rz: List[torch.Tensor], state, i: int):
+        #     ww = self.time_first + k[i]
+        #     p = torch.maximum(state[4], ww)
 
-            e1 = (state[4] - p).exp()
+        #     e1 = (state[4] - p).exp()
 
-            e2 = (ww - p).exp()
+        #     e2 = (ww - p).exp()
 
-            a = e1 * (state[2]) + e2 * v[i]
+        #     a = e1 * (state[2]) + e2 * v[i]
 
-            b = e1 * (state[3]) + e2
+        #     b = e1 * (state[3]) + e2
 
-            wwn = state[4] + self.time_decay
+        #     wwn = state[4] + self.time_decay
 
-            p1 = torch.maximum(wwn, k[i])
+        #     p1 = torch.maximum(wwn, k[i])
 
-            e11 = (wwn - p1).exp()
+        #     e11 = (wwn - p1).exp()
 
-            e21 = (k[i] - p1).exp()
+        #     e21 = (k[i] - p1).exp()
 
-            outb = e11 * state[2] + e21 * v[i]
+        #     outb = e11 * state[2] + e21 * v[i]
 
-            outc = e11 * state[3] + e21
+        #     outc = e11 * state[3] + e21
 
-            state[2:5] = torch.stack((outb, outc, p1))
+        #     state[2:5] = torch.stack((outb, outc, p1))
 
-            wkv = a / b
+        #     wkv = a / b
 
-            rz.append(wkv)
-            return rz, state
+        #     rz.append(wkv)
+        #     return rz, state
 
         def processLayerx(self, k, v, rz: List[torch.Tensor], state, i: int):
             ki = k[i]
