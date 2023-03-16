@@ -58,10 +58,11 @@ __half *cast(fp16 *ptr)
 
 __global__ void kernel_mm8_seq(
     const int B, const int N, const int M,
-    const __half *__restrict__ const x, const int x_stride,
+    const fp16 *__restrict__ const x, const int x_stride,
     const uint8_t *__restrict__ const w, const int w_stride,
-    __half *__restrict__ const y, const int y_stride,
-    __half *__restrict__ const r
+    fp16 *__restrict__ const y, const int y_stride,
+    fp16 *__restrict__ const r
+    
     )
 {
 
@@ -73,9 +74,9 @@ __global__ void kernel_mm8_seq(
         float y_local = 0;
         for (int j = 0; j < N; ++j)
         {
-            y_local += __half2float(x[i * x_stride + j]) * w[k * w_stride + j] * __half2float(r[j]);
+            y_local +=(x[i * x_stride + j]) * (w[k * w_stride + j] * (r[j]));
         }
-        y[i * y_stride + k] = __float2half(y_local);
+        y[i * y_stride + k] = (y_local);
     }
 }
 void cuda_mm8_seq(int B, int N, int M,
@@ -88,6 +89,6 @@ void cuda_mm8_seq(int B, int N, int M,
     dim3 blockSize(1, 64);
     dim3 gridSize((B + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
     kernel_mm8_seq<<<gridSize, blockSize>>>(
-        B, N, M, cast(x), x_stride, w, w_stride,
-        cast(y), y_stride,cast(r));
+        B, N, M, (x), x_stride, w, w_stride,
+        (y), y_stride,(r));
 }
