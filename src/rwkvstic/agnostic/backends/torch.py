@@ -15,7 +15,7 @@ load(
     is_python_module=False)
 
 
-def cuda_mm8(B: int, N: int, M: int, x, w):
+def cuda_mm8(B: int, N: int, M: int, x, w, r):
     assert x.dtype == torch.float16
     assert w.dtype == torch.uint8
     
@@ -23,39 +23,34 @@ def cuda_mm8(B: int, N: int, M: int, x, w):
     assert [w.shape[0], w.shape[1]] == [N, M]
     assert x.device == w.device
     assert x.device.type == 'cuda'
-    print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
-    try:
-        y = torch.empty((B, M), device=w.device, dtype=torch.float16)
-        torch.ops.rwkv.mm8_seq(B, N, M, x, w, y)
-    except:
-        print("cuda_mm8: y allocation failed")
-        exit()
+    #print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
+    # try:
+    # print(r.shape, r.dtype)
+    y = torch.empty((B, M), device=w.device, dtype=torch.float16)
+    torch.ops.rwkv.mm8_seq(B, N, M, x, w, y, r.to(dtype=torch.float16))
+
 
     
     return y
-xx = torch.tensor([[0,3,6,3,3,3,3,3,3],[3,5,1,3,3,3,3,3,3],[3,5,1,3,3,3,3,3,3],[3,5,1,3,3,3,3,3,3]]).to(torch.float16).cuda()
-yy = torch.tensor([[1,1,1,3,3,3,3,3,3],[1,2,1,3,3,3,3,3,3],[1,1,1,3,3,3,3,3,3],[1,1,1,3,3,3,3,3,3]]).to(torch.uint8).cuda().t()
-print(cuda_mm8(xx.shape[0],xx.shape[1],yy.shape[1],xx,yy))
-print(xx@yy.to(torch.float16))
 
-xx = torch.tensor([[0,3,6],[3,5,1],[3,5,1],[3,5,1]]).to(torch.float16).cuda()
-yy = torch.tensor([[1,1,1],[1,2,1],[1,1,1]]).to(torch.uint8).cuda().t()
-print(cuda_mm8(4,3,3,xx,yy))
-print(xx@yy.to(torch.float16))
-# print(cuda_mm8(
-#     2,2,2,xx20,yy
-#     ))
-# print(xx20 @ yy.to(torch.float16))
-# print(
-#     cuda_mm8(2,2,2,xx21,yy))
-# print(
-#     xx21 @ yy.to(torch.float16))
-# print(
-#     cuda_mm8(2,2,2,xx22,yy))
-# print(
-#     xx22 @ yy.to(torch.float16))
+# def test_cuda_mm8(b,t,c):
+#     xx = torch.rand(b,t).to(dtype=torch.float16, device='cuda')
+#     ww = (torch.rand(c,t)*255).to(dtype=torch.uint8, device='cuda').t()
+    
+#     yy = cuda_mm8(b,t,c,xx,ww)
+#     yy1 = torch.mm(xx/255,ww.to(dtype=torch.float16))
+#     print((yy - yy1).abs().max())
 
-exit()
+# test_cuda_mm8(5, 3, 3)
+# test_cuda_mm8(5, 10, 3)
+# test_cuda_mm8(5, 3, 10)
+# test_cuda_mm8(5, 10, 10)
+# test_cuda_mm8(5, 100, 10)
+# test_cuda_mm8(5, 10, 100)
+# test_cuda_mm8(5, 768, 768)
+# test_cuda_mm8(5, 4*768, 768)
+# test_cuda_mm8(5, 768, 4*768)
+# exit()
 
 class RWKVPTOps(RWKVOp.module):
 
@@ -301,7 +296,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             if len(x) != 3:
                 return x.to(device=y.device, non_blocking=True).matmul(y.to(dtype=x.dtype).t()).to(dtype=y.dtype).t()
             rx, spread, zpoint = x
-            yy = y*spread
+            yy = y
 
             yy = yy.to(dtype=dtype)
 
@@ -313,15 +308,15 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
 
             xmain = cuda_mm8(yy.shape[0], yy.shape[1], rx.shape[1], yy, rx.to(
-                device=yy.device, non_blocking=True)).to(dtype=runtimedtype)
+                device=yy.device, non_blocking=True),spread).to(dtype=runtimedtype)
             
 
-            xmain2 = yy.matmul(
-                rx.to(dtype=dtype, device=y.device, non_blocking=True)).to(dtype=runtimedtype)
+            # xmain2 = yy.matmul(
+            #     rx.to(dtype=dtype, device=y.device, non_blocking=True)).to(dtype=runtimedtype)
             
-            print (xmain.shape, xmain2.shape)
-            print (xmain[0,0], xmain2[0,0])
-            print (xmain[0,1], xmain2[0,1])
+            # print (xmain.shape, xmain2.shape)
+            # print (xmain[0,0], xmain2[0,0])
+            # print (xmain[0,1], xmain2[0,1])
             
             # print((xmain-xmain2).abs().max())
             zp = (y@zpoint).reshape(-1, 1)
