@@ -261,24 +261,48 @@ class RWKVCudaQuantOps(RWKVPTOps):
                         "-O3", "--extra-device-vectorization"],
         is_python_module=False)
 
-        @torch.jit.script
+        # @torch.jit.script
         def cuda_mm8(B: int, N: int, M: int, x, w, r):
             assert x.dtype == torch.float16
             assert w.dtype == torch.uint8
-            
-            assert [x.shape[0], x.shape[1]] == [B, N]
-            assert [w.shape[0], w.shape[1]] == [N, M]
-            assert x.device == w.device
-            assert x.device.type == 'cuda'
+
+
+            # assert [x.shape[0], x.shape[1]] == [B, N]
+            # assert [w.shape[0], w.shape[1]] == [N, M]
+            # assert x.device == w.device
+            # assert x.device.type == 'cuda'
             #print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
             # try:
-            # print(r.shape, r.dtype)
-            y = torch.empty((B, M), device=w.device, dtype=torch.float16)
-            torch.ops.rwkv.mm8_seq(B, N, M, x, w, y, r.to(dtype=torch.float16))
-
-
+            # print(x.shape, x.dtype)
+            # print(B)
+            if B > 1:
+                return ((x*r) @ w.to(dtype=torch.float16)).squeeze().to(self.runtimedtype)
+                # too slow
+                # use uint8@fp16 matmul library cutlass
+        
             
-            return y
+            else:
+                assert w.dtype == torch.uint8
+                x = x[0]
+                assert x.shape[0] == M
+                w = w.contiguous()
+                assert [w.shape[0],w.shape[1]] == [M, N]
+                y = torch.zeros((N,), device=w.device, dtype=torch.float16)
+                torch.ops.rwkv.mm8_one(M,N, x, w, y,r)
+                
+                y = y.to(dtype=torch.float16)
+
+                # print(y.shape)
+                return y.unsqueeze(0)
+        # test
+        # xx = torch.rand(1,5).half().cuda()
+        # xy = torch.rand(10,5).mul(5).to(dtype=torch.uint8).cuda().t()
+        # print(xx.unsqueeze(0)@xy.half())
+        # tx = cuda_mm8(1,xy.shape[1],xy.shape[0],xx,xy)
+        # print(tx.shape)
+        # print(tx.cpu().float())
+        
+        # exit()
         y = torch.empty((20, embed), device=dev, memory_format=torch.contiguous_format, dtype=torch.float16)
         def cuda_wkv(T: int, C: int, w, u, k, v, aa, bb, pp):
             assert 1 * C % min(C, 32) == 0
@@ -327,7 +351,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
 
 
-            xmain = cuda_mm8(yy.shape[0], yy.shape[1], rx.shape[1], yy, rx.to(
+            xmain = cuda_mm8(yy.shape[0], rx.shape[1], rx.shape[0], yy, rx.to(
                 device=yy.device, non_blocking=True),spread).to(dtype=runtimedtype)
             
 
@@ -390,7 +414,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             xx = [QuantizeMatrix(x, runtimedtype, dev, dostream)
                   for x in splitmatrices]
             xxo = torch.cat([x[0]
-                                          for x in xx], 1).t().cuda()
+                                          for x in xx], 1).cuda().t().contiguous()
             xx1 = torch.cat([x[1] for x in xx])
             xx2 = torch.cat([x[2] for x in xx])
             return xxo, xx1, xx2

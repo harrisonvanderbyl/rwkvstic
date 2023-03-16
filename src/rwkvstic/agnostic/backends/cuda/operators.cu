@@ -62,7 +62,7 @@ __global__ void kernel_mm8_seq(
     const uint8_t *__restrict__ const w, const int w_stride,
     fp16 *__restrict__ const y, const int y_stride,
     fp16 *__restrict__ const r
-    
+
     )
 {
 
@@ -91,4 +91,42 @@ void cuda_mm8_seq(int B, int N, int M,
     kernel_mm8_seq<<<gridSize, blockSize>>>(
         B, N, M, (x), x_stride, w, w_stride,
         (y), y_stride,(r));
+}
+
+#define MM8_ONE_JSPLIT 32
+#define MM8_ONE_TILE 1024
+
+__global__ void kernel_mm8_one(
+    const int N, const int M,
+    const __half *__restrict__ const x,
+    const uint8_t *__restrict__ const w, const int w_stride,
+    __half *__restrict__ const y,
+    const __half *__restrict__ const r
+    ){
+
+    const int k = blockIdx.y * blockDim.y + threadIdx.y;
+    const int j0 = min(N, blockIdx.x * ((N + MM8_ONE_JSPLIT - 1) / MM8_ONE_JSPLIT));
+    const int j1 = min(N, (blockIdx.x + 1) * ((N + MM8_ONE_JSPLIT - 1) / MM8_ONE_JSPLIT));
+
+    if (k < M) {
+        float y_local = 0;
+        for (int j = j0; j < j1; ++j) {
+            y_local += __half2float(x[j]) * (
+                (float(w[j * w_stride + k])* __half2float(r[j]))
+                
+            );
+        }
+        atomicAdd(&y[k], __float2half(y_local));
+    }
+}
+void cuda_mm8_one(int N, int M,
+                  fp16 *x,
+                  uint8_t *w, int w_stride,
+                  fp16 *y,
+                    fp16 *r   
+                ) {
+    dim3 blockSize(1, MM8_ONE_TILE);
+    dim3 gridSize(MM8_ONE_JSPLIT, (M + blockSize.y - 1) / blockSize.y);
+    kernel_mm8_one<<<gridSize, blockSize>>>(
+        N, M, cast(x), w, w_stride,cast(y), cast(r));
 }
