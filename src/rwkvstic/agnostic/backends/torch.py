@@ -5,33 +5,6 @@ import torch
 from torch.utils.cpp_extension import load
 import os
 current_path = os.path.dirname(os.path.abspath(__file__))
-load(
-    name=f"wkv_cuda",
-    sources=[f"{current_path}/cuda/wrapper.cpp",
-             f"{current_path}/cuda/operators.cu"],
-    verbose=True,
-    extra_cuda_cflags=["-std=c++17",  # "--use_fast_math",
-                       "-O3", ],  # "--extra-device-vectorization"],
-    is_python_module=False)
-
-
-def cuda_mm8(B: int, N: int, M: int, x, w, r):
-    assert x.dtype == torch.float16
-    assert w.dtype == torch.uint8
-    
-    assert [x.shape[0], x.shape[1]] == [B, N]
-    assert [w.shape[0], w.shape[1]] == [N, M]
-    assert x.device == w.device
-    assert x.device.type == 'cuda'
-    #print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
-    # try:
-    # print(r.shape, r.dtype)
-    y = torch.empty((B, M), device=w.device, dtype=torch.float16)
-    torch.ops.rwkv.mm8_seq(B, N, M, x, w, y, r.to(dtype=torch.float16))
-
-
-    
-    return y
 
 # def test_cuda_mm8(b,t,c):
 #     xx = torch.rand(b,t).to(dtype=torch.float16, device='cuda')
@@ -272,6 +245,34 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 
 class RWKVCudaQuantOps(RWKVPTOps):
     import torch
+    load(
+    name=f"wkv_cuda",
+    sources=[f"{current_path}/cuda/wrapper.cpp",
+             f"{current_path}/cuda/operators.cu"],
+    verbose=True,
+    extra_cuda_cflags=["-std=c++17",  # "--use_fast_math",
+                       "-O3", ],  # "--extra-device-vectorization"],
+    is_python_module=False)
+
+
+    def cuda_mm8(B: int, N: int, M: int, x, w, r):
+        assert x.dtype == torch.float16
+        assert w.dtype == torch.uint8
+        
+        assert [x.shape[0], x.shape[1]] == [B, N]
+        assert [w.shape[0], w.shape[1]] == [N, M]
+        assert x.device == w.device
+        assert x.device.type == 'cuda'
+        #print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
+        # try:
+        # print(r.shape, r.dtype)
+        y = torch.empty((B, M), device=w.device, dtype=torch.float16)
+        torch.ops.rwkv.mm8_seq(B, N, M, x, w, y, r.to(dtype=torch.float16))
+
+
+        
+        return y
+
 
     def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.float16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
         import torch
