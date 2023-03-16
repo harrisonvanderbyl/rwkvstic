@@ -10,7 +10,7 @@ import time
 def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
     tt = time.time()
     nnewctx = newctx
-    btch = 20
+    btch = 1
     o = (None, statex)
 
     while len(newctx) > 0:

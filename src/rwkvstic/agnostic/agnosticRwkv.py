@@ -114,7 +114,7 @@ def AgnosticRWKV(ops: module, *args):
         #     rz = self.arrayPush(rz, wrd, i)
         #     return rz, state
         def wkv(self, H, k, v, state, td,tf):
-            
+            rz = []
             for i in self.rng(H):
 
                 rz, state = self.processLayer(k, v, rz, state, td,tf, i)
