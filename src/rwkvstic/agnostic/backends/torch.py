@@ -245,39 +245,58 @@ class RWKVCudaDeepspeedOps(RWKVCudaOps):
 
 class RWKVCudaQuantOps(RWKVPTOps):
     import torch
-    load(
-    name=f"wkv_cuda",
-    sources=[f"{current_path}/cuda/wrapper.cpp",
-             f"{current_path}/cuda/operators.cu"],
-    verbose=True,
-    extra_cuda_cflags=["-std=c++17",  # "--use_fast_math",
-                       "-O3", ],  # "--extra-device-vectorization"],
-    is_python_module=False)
-
-
-    def cuda_mm8(B: int, N: int, M: int, x, w, r):
-        assert x.dtype == torch.float16
-        assert w.dtype == torch.uint8
-        
-        assert [x.shape[0], x.shape[1]] == [B, N]
-        assert [w.shape[0], w.shape[1]] == [N, M]
-        assert x.device == w.device
-        assert x.device.type == 'cuda'
-        #print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
-        # try:
-        # print(r.shape, r.dtype)
-        y = torch.empty((B, M), device=w.device, dtype=torch.float16)
-        torch.ops.rwkv.mm8_seq(B, N, M, x, w, y, r.to(dtype=torch.float16))
-
-
-        
-        return y
+    
 
 
     def __init__(self, layers, embed, *args, runtimedtype=None, dtype=torch.float16, useGPU=None, chunksize=32, preQuantized=False, maxQuantTarget=None, target=None, dev="cuda", **kwargs):
         import torch
         import inquirer
         super().__init__(layers, embed, *args, dtype=dtype, **kwargs)
+        load(
+        name=f"wkv_cuda",
+        sources=[f"{current_path}/cuda/wrapper.cpp",
+                f"{current_path}/cuda/operators.cu"],
+        verbose=True,
+        extra_cuda_cflags=["-std=c++17", "--use_fast_math",
+                        "-O3", "--extra-device-vectorization"],
+        is_python_module=False)
+
+        @torch.jit.script
+        def cuda_mm8(B: int, N: int, M: int, x, w, r):
+            assert x.dtype == torch.float16
+            assert w.dtype == torch.uint8
+            
+            assert [x.shape[0], x.shape[1]] == [B, N]
+            assert [w.shape[0], w.shape[1]] == [N, M]
+            assert x.device == w.device
+            assert x.device.type == 'cuda'
+            #print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
+            # try:
+            # print(r.shape, r.dtype)
+            y = torch.empty((B, M), device=w.device, dtype=torch.float16)
+            torch.ops.rwkv.mm8_seq(B, N, M, x, w, y, r.to(dtype=torch.float16))
+
+
+            
+            return y
+        y = torch.empty((20, embed), device=dev, memory_format=torch.contiguous_format, dtype=torch.float16)
+        def cuda_wkv(T: int, C: int, w, u, k, v, aa, bb, pp):
+            assert 1 * C % min(C, 32) == 0
+            assert k.dtype == torch.float16
+            w = w.contiguous()
+            u = u.contiguous()
+            k = k.contiguous()
+            v = v.contiguous()
+            
+            torch.ops.rwkv.wkv_forward(1, T, C, w, u, k, v, y, aa, bb, pp)
+            return y[:T].to(self.runtimedtype), aa.to(self.runtimedtype), bb.to(self.runtimedtype), pp.to(self.runtimedtype)
+        
+        def rwkvinterop(H, k, v, state, td,tf):
+            
+            rz, state[2], state[3], state[4] = cuda_wkv(H, embed, td.float(), tf.float(), k.half(), v.half(), state[2].float(), state[3].float(), state[4].float())
+            return rz, state
+
+        self.wkv = rwkvinterop
 
         def QuantizeMatrix(x, runtimeDtype, device, stream):
             rang = 255
@@ -289,9 +308,9 @@ class RWKVCudaQuantOps(RWKVPTOps):
                     dtype=torch.uint8, non_blocking=True).pin_memory()
             else:
                 x = x.to(
-                    dtype=torch.uint8, non_blocking=True, device=device)
+                    dtype=torch.uint8, non_blocking=True, device="cpu")
 
-            return [x, ran.to(runtimeDtype).to(device=device), mini.to(runtimeDtype).to(device=device)]
+            return [x, ran.to(torch.float16).to(device=device), mini.to(runtimeDtype).to(device=device)]
 
         def QuantizedMatVec(x, y, runtimedtype):
             if len(x) != 3:
@@ -320,7 +339,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             # print (xmain[0,1], xmain2[0,1])
             
             # print((xmain-xmain2).abs().max())
-            zp = (y@zpoint).reshape(-1, 1)
+            zp = (y.to(runtimedtype)@zpoint).reshape(-1, 1)
             return xmain + zp
         cuda = dev
         dev = cuda if (inquirer.confirm(
@@ -371,7 +390,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             xx = [QuantizeMatrix(x, runtimedtype, dev, dostream)
                   for x in splitmatrices]
             xxo = torch.cat([x[0]
-                                          for x in xx], 1).t()
+                                          for x in xx], 1).t().cuda()
             xx1 = torch.cat([x[1] for x in xx])
             xx2 = torch.cat([x[2] for x in xx])
             return xxo, xx1, xx2

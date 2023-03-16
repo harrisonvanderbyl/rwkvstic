@@ -59,8 +59,8 @@ def AgnosticRWKV(ops: module, *args):
             if ops.useLogFix:
                 self.processLayer = self.processLayerx
 
-        def processLayerx(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
-            ww = self.time_first[xx] + k[i]
+        def processLayerx(self, k, v, rz: List[torch.Tensor], state, td,tf, i: int):
+            ww = tf + k[i]
             p = self.maximum(state[4], ww)
 
             e1 = self.exp(self.subtract((state[4]), p))
@@ -74,7 +74,7 @@ def AgnosticRWKV(ops: module, *args):
                 e1, (state[3])), e2)
 
             wwn = self.add((
-                state[4]), self.time_decay[xx])
+                state[4]), td)
 
             p1 = self.maximum(wwn, k[i])
 
@@ -96,18 +96,23 @@ def AgnosticRWKV(ops: module, *args):
             rz = self.arrayPush(rz, wkv, i)
             return rz, state
 
-        def processLayer(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
-            ki = self.exp(k[i])
-            wrd = self.divide(
-                self.add(state[2], self.multiply(self.multiply(ki, v[i]), self.exp(self.time_first[xx]))), self.add(state[3], self.multiply(ki, self.exp(self.time_first[xx]))))
+        # def processLayer(self, k, v, rz: List[torch.Tensor], state, xx: int, i: int):
+        #     ki = self.exp(k[i])
+        #     wrd = self.divide(
+        #         self.add(state[2], self.multiply(self.multiply(ki, v[i]), self.exp(self.time_first[xx]))), self.add(state[3], self.multiply(ki, self.exp(self.time_first[xx]))))
 
-            state = self.scatter(state, self.scatterindices[1], self.multiply(self.exp(self.time_decay[xx]), self.add(
-                state[2:4], self.stack((self.multiply(
-                    v[i], ki), ki)))))
+        #     state = self.scatter(state, self.scatterindices[1], self.multiply(self.exp(self.time_decay[xx]), self.add(
+        #         state[2:4], self.stack((self.multiply(
+        #             v[i], ki), ki)))))
 
-            rz = self.arrayPush(rz, wrd, i)
-            return rz, state
+        #     rz = self.arrayPush(rz, wrd, i)
+        #     return rz, state
+        def wkv(self, H, k, v, state, td,tf):
+            
+            for i in self.rng(H):
 
+                rz, state = self.processLayer(k, v, rz, state, td,tf, i)
+            return self.stack(rz), state
         @ ops.layerdef
         def doLayer(self, x, state, xx: int):
 
@@ -126,14 +131,15 @@ def AgnosticRWKV(ops: module, *args):
 
             r = self.logistical(rr)
 
-            rz = self.emptyarray(self.len(x))
+            
 
-            for i in self.rng(self.len(x)):
+            rz, state = self.wkv(self.len(x), k, v, state, self.time_decay[xx],self.time_first[xx])
+            
 
-                rz, state = self.processLayer(k, v, rz, state, xx, i)
+            
 
             mvv = self.add(x, self.matvec(
-                self.outputvv[xx], self.multiply(r, self.stack(rz))))
+                self.outputvv[xx], self.multiply(r, rz)))
 
             ddd = self.layernorm(mvv, self.ln2w[xx], self.ln2b[xx])
 
