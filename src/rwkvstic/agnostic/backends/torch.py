@@ -303,7 +303,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
         # print(tx.cpu().float())
         
         # exit()
-        y = torch.empty((20, embed), device=dev, memory_format=torch.contiguous_format, dtype=torch.float16)
+        @torch.jit.script
         def cuda_wkv(T: int, C: int, w, u, k, v, aa, bb, pp):
             assert 1 * C % min(C, 32) == 0
             assert k.dtype == torch.float16
@@ -311,9 +311,10 @@ class RWKVCudaQuantOps(RWKVPTOps):
             u = u.contiguous()
             k = k.contiguous()
             v = v.contiguous()
-            
+            y = torch.empty((T, C), device="cuda", memory_format=torch.contiguous_format, dtype=torch.float16)
+        
             torch.ops.rwkv.wkv_forward(1, T, C, w, u, k, v, y, aa, bb, pp)
-            return y[:T].to(self.runtimedtype), aa.to(self.runtimedtype), bb.to(self.runtimedtype), pp.to(self.runtimedtype)
+            return y, aa, bb, pp
         
         def rwkvinterop(H, k, v, state, td,tf):
             
