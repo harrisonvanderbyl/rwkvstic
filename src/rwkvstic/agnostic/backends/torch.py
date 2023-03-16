@@ -1,7 +1,61 @@
 
 from typing import List, Union
 import rwkvstic.agnostic.backends.base as RWKVOp
+import torch
+from torch.utils.cpp_extension import load
+import os
+current_path = os.path.dirname(os.path.abspath(__file__))
+load(
+    name=f"wkv_cuda",
+    sources=[f"{current_path}/cuda/wrapper.cpp",
+             f"{current_path}/cuda/operators.cu"],
+    verbose=True,
+    extra_cuda_cflags=["-std=c++17",  # "--use_fast_math",
+                       "-O3", ],  # "--extra-device-vectorization"],
+    is_python_module=False)
 
+
+def cuda_mm8(B: int, N: int, M: int, x, w):
+    assert x.dtype == torch.float16
+    assert w.dtype == torch.uint8
+    
+    assert [x.shape[0], x.shape[1]] == [B, N]
+    assert [w.shape[0], w.shape[1]] == [N, M]
+    assert x.device == w.device
+    assert x.device.type == 'cuda'
+    print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
+    try:
+        y = torch.empty((B, M), device=w.device, dtype=torch.float16)
+        torch.ops.rwkv.mm8_seq(B, N, M, x, w, y)
+    except:
+        print("cuda_mm8: y allocation failed")
+        exit()
+
+    
+    return y
+xx = torch.tensor([[0,3,6,3,3,3,3,3,3],[3,5,1,3,3,3,3,3,3],[3,5,1,3,3,3,3,3,3],[3,5,1,3,3,3,3,3,3]]).to(torch.float16).cuda()
+yy = torch.tensor([[1,1,1,3,3,3,3,3,3],[1,2,1,3,3,3,3,3,3],[1,1,1,3,3,3,3,3,3],[1,1,1,3,3,3,3,3,3]]).to(torch.uint8).cuda().t()
+print(cuda_mm8(xx.shape[0],xx.shape[1],yy.shape[1],xx,yy))
+print(xx@yy.to(torch.float16))
+
+xx = torch.tensor([[0,3,6],[3,5,1],[3,5,1],[3,5,1]]).to(torch.float16).cuda()
+yy = torch.tensor([[1,1,1],[1,2,1],[1,1,1]]).to(torch.uint8).cuda().t()
+print(cuda_mm8(4,3,3,xx,yy))
+print(xx@yy.to(torch.float16))
+# print(cuda_mm8(
+#     2,2,2,xx20,yy
+#     ))
+# print(xx20 @ yy.to(torch.float16))
+# print(
+#     cuda_mm8(2,2,2,xx21,yy))
+# print(
+#     xx21 @ yy.to(torch.float16))
+# print(
+#     cuda_mm8(2,2,2,xx22,yy))
+# print(
+#     xx22 @ yy.to(torch.float16))
+
+exit()
 
 class RWKVPTOps(RWKVOp.module):
 
@@ -19,6 +73,7 @@ class RWKVPTOps(RWKVOp.module):
             a = inquirer.prompt(q)
             dtype = a['type']
         self.dtype = dtype
+
         self.runtimedtype = kwargs.get('runtimedtype', dtype)
         # self.sample = torchsample
 
@@ -250,8 +305,25 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
             yy = yy.to(dtype=dtype)
 
-            xmain = yy.matmul(
+            # clone and reset stride to 1
+            # yy = yy.clone().reshape(-1, yy.shape[1])
+
+            # reset stride[1] to 1
+
+
+
+            xmain = cuda_mm8(yy.shape[0], yy.shape[1], rx.shape[1], yy, rx.to(
+                device=yy.device, non_blocking=True)).to(dtype=runtimedtype)
+            
+
+            xmain2 = yy.matmul(
                 rx.to(dtype=dtype, device=y.device, non_blocking=True)).to(dtype=runtimedtype)
+            
+            print (xmain.shape, xmain2.shape)
+            print (xmain[0,0], xmain2[0,0])
+            print (xmain[0,1], xmain2[0,1])
+            
+            # print((xmain-xmain2).abs().max())
             zp = (y@zpoint).reshape(-1, 1)
             return xmain + zp
         cuda = dev
@@ -302,7 +374,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
             xx = [QuantizeMatrix(x, runtimedtype, dev, dostream)
                   for x in splitmatrices]
-            xxo = torch.cat([x[0] for x in xx], 1).t()
+            xxo = torch.cat([x[0]
+                                          for x in xx], 1).t()
             xx1 = torch.cat([x[1] for x in xx])
             xx2 = torch.cat([x[2] for x in xx])
             return xxo, xx1, xx2
