@@ -261,7 +261,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
                         "-O3", "--extra-device-vectorization"],
         is_python_module=False)
 
-        # @torch.jit.script
+        @torch.jit.script
         def cuda_mm8(B: int, N: int, M: int, x, w, r):
             assert x.dtype == torch.float16
             assert w.dtype == torch.uint8
@@ -276,7 +276,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             # print(x.shape, x.dtype)
             # print(B)
             if B > 1:
-                return ((x*r) @ w.to(dtype=torch.float16)).squeeze().to(self.runtimedtype)
+                return ((x*r) @ w.to(dtype=torch.float16)).squeeze()
                 # too slow
                 # use uint8@fp16 matmul library cutlass
         
