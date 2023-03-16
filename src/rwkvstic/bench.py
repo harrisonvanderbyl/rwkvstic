@@ -2,8 +2,25 @@ import time
 import torch
 from rwkvstic.load import RWKV
 def bechmark():
+    # choose a file to load with the file picker dialog
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename( 
+        initialdir = "./",
+        title = "Select a File",
+        filetypes = (
+            ("pth files","*.pth"),
+            ("all files","*.*")
+        )
+    )
+    print(file_path)
 
-    model = RWKV()
+
+    model = RWKV( 
+        path=file_path,
+    )
 
 
     context = '''
