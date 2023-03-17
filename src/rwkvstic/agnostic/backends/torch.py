@@ -285,7 +285,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
                 assert w.dtype == torch.uint8
                 x = x[0]
                 assert x.shape[0] == M
-                w = w.contiguous()
+                
                 assert [w.shape[0],w.shape[1]] == [M, N]
                 y = torch.zeros((N,), device=w.device, dtype=torch.float16)
                 torch.ops.rwkv.mm8_one(M,N, x, w, y,r)
@@ -415,7 +415,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
             xx = [QuantizeMatrix(x, runtimedtype, dev, dostream)
                   for x in splitmatrices]
             xxo = torch.cat([x[0]
-                                          for x in xx], 1).cuda().t().contiguous()
+                                          for x in xx], 1).t().contiguous().cuda()
             xx1 = torch.cat([x[1] for x in xx])
             xx2 = torch.cat([x[2] for x in xx])
             return xxo, xx1, xx2
