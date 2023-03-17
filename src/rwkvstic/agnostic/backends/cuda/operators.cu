@@ -86,7 +86,7 @@ void cuda_mm8_seq(int B, int N, int M,
                     fp16 *r
                   )
 {
-    dim3 blockSize(1, 64);
+    dim3 blockSize(1, 128);
     dim3 gridSize((B + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
     kernel_mm8_seq<<<gridSize, blockSize>>>(
         B, N, M, (x), x_stride, w, w_stride,
