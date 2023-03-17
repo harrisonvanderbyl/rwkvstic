@@ -37,6 +37,13 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
             if not os.path.exists(fileName):
                 urllib.request.urlretrieve(path, fileName)
             path = fileName
+    
+    if kwargs.get("opt",False):
+        from rwkvstic.agnostic.backends.opt import OptRWKV
+        model = OptRWKV(path)
+        import torch
+        from rwkvstic.agnostic.samplers.numpy import npsample
+        return RWKVMaster(model, model.emptyState, torch.tensor, torch.LongTensor, npsample, tokenizer)
 
     if kwargs.get("strategy", None) is not None:
         return chatRWKV.initRWKVOriginal(path, kwargs["strategy"], tokenizer)

@@ -31,7 +31,7 @@ void mm8_seq(int64_t B, int64_t N, int64_t M,
     cuda_mm8_seq(
         B, N, M,
         x.data_ptr<fp16>(), x.stride(0),
-        w.data_ptr<uint8_t>(), w.stride(1),
+        w.data_ptr<uint8_t>(), w.stride(0),
         y.data_ptr<fp16>(), y.stride(0),
         r.data_ptr<fp16>()
         );

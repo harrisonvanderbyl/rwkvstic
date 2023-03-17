@@ -6,24 +6,7 @@ from torch.utils.cpp_extension import load
 import os
 current_path = os.path.dirname(os.path.abspath(__file__))
 
-# def test_cuda_mm8(b,t,c):
-#     xx = torch.rand(b,t).to(dtype=torch.float16, device='cuda')
-#     ww = (torch.rand(c,t)*255).to(dtype=torch.uint8, device='cuda').t()
-    
-#     yy = cuda_mm8(b,t,c,xx,ww)
-#     yy1 = torch.mm(xx/255,ww.to(dtype=torch.float16))
-#     print((yy - yy1).abs().max())
 
-# test_cuda_mm8(5, 3, 3)
-# test_cuda_mm8(5, 10, 3)
-# test_cuda_mm8(5, 3, 10)
-# test_cuda_mm8(5, 10, 10)
-# test_cuda_mm8(5, 100, 10)
-# test_cuda_mm8(5, 10, 100)
-# test_cuda_mm8(5, 768, 768)
-# test_cuda_mm8(5, 4*768, 768)
-# test_cuda_mm8(5, 768, 4*768)
-# exit()
 
 class RWKVPTOps(RWKVOp.module):
 
@@ -267,20 +250,8 @@ class RWKVCudaQuantOps(RWKVPTOps):
             assert w.dtype == torch.uint8
 
 
-            # assert [x.shape[0], x.shape[1]] == [B, N]
-            # assert [w.shape[0], w.shape[1]] == [N, M]
-            # assert x.device == w.device
-            # assert x.device.type == 'cuda'
-            #print("cuda_mm8: ", B, N, M, x.device, w.device, x.dtype, w.dtype, x.shape, w.shape, x[0][0])
-            # try:
-            # print(x.shape, x.dtype)
-            # print(B)
             if B > 1:
                 return ((x*r) @ w.to(dtype=torch.float16)).squeeze()
-                # too slow
-                # use uint8@fp16 matmul library cutlass
-        
-            
             else:
                 assert w.dtype == torch.uint8
                 x = x[0]
@@ -294,15 +265,7 @@ class RWKVCudaQuantOps(RWKVPTOps):
 
                 # print(y.shape)
                 return y.unsqueeze(0)
-        # test
-        # xx = torch.rand(1,5).half().cuda()
-        # xy = torch.rand(10,5).mul(5).to(dtype=torch.uint8).cuda().t()
-        # print(xx.unsqueeze(0)@xy.half())
-        # tx = cuda_mm8(1,xy.shape[1],xy.shape[0],xx,xy)
-        # print(tx.shape)
-        # print(tx.cpu().float())
-        
-        # exit()
+
         @torch.jit.script
         def cuda_wkv(T: int, C: int, w, u, k, v, aa, bb, pp):
             assert 1 * C % min(C, 32) == 0

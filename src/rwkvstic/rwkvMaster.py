@@ -10,14 +10,17 @@ import time
 def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
     tt = time.time()
     nnewctx = newctx
+    ll = len(newctx)
     btch = 20
     o = (None, statex)
 
     while len(newctx) > 0:
+        print(len(newctx)/ll * 100, "%", "remaining")
         m = newctx[:btch]
         newctx = newctx[btch:]
         o = model.forward(m, o[1])
         progressCallBack(m)
+        
 
     # print("loaded context in", time.time()-tt, "seconds")
     # print(o[0][0])
@@ -49,8 +52,8 @@ class RWKVMaster():
         self.initTensor = initTensor
         self.intTensor = intTensor
         self.sampler = sampler
-
-    def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1, stopStrings: List[str] = ["<|endoftext|>"], stopTokens: List[int] = [0], progressLambda=lambda args: args, end_adj=0.0):
+    logging=False
+    def forward(self, state=None, temp: float = 1.0, top_p_usual: float = 0.8, number=1, stopStrings: List[str] = ["<|endoftext|>"], stopTokens: List[int] = [0], progressLambda=(lambda args: print(args["current"],end="",flush=True)) if logging else (lambda x:x), end_adj=0.0):
         ostate = self.myState if state is None else state
         tolens = []
         for i in range(number):
@@ -63,6 +66,7 @@ class RWKVMaster():
             self.myState = ostate
             sampled = self.sample(
                 logits, temp, top_p_usual) if self.sampler is not None else logits
+            
             try:
                 self.lastToken = [sampled.cpu().numpy()[0]]
             except:
@@ -84,13 +88,14 @@ class RWKVMaster():
         # print(newctx)
         ctx = self.tokenizer.encode(ctx)
         newctx = self.tokenizer.encode(newctx)
-        if self.model.RnnOnly:
+        self.lastToken = [ctx[-1]]
+        if self.model.__dict__.get("RnnOnly", False):
             ctx, state = rnnloadContext(
                 self.model, ctx, self.intTensor(newctx), statex, progressCallBack)
         else:
             ctx, state = loadContext(
                 self.model, ctx, self.intTensor(newctx), statex, progressCallBack)
-        self.lastToken = ctx[-1]
+        
         self.myState = state
         return ctx, state
 
