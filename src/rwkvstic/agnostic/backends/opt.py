@@ -87,17 +87,17 @@ with torch.no_grad():
                 B = y.shape[0]
                 yy = y.to(self.runtimedtype)
                 if B > 1:
-                    xmain = (yy*self.range) @ self.weight.to(self.runtimedtype)
- 
+                    xmain = (yy*self.range).to(torch.float16) @ self.weight.to(torch.float16)
+                    xmain = xmain.to(self.runtimedtype)
                     zp = (y.mv(self.offset)).reshape(-1, 1)
                     
                      
                     return xmain + zp 
-                
+                zp = (y.mul(self.offset).sum()).to(self.runtimedtype)
                 xmain = self.cuda_mm8(self.N, self.M, yy, self.weight,self.range).to(self.runtimedtype)
                 
 
-                zp = (y@self.offset).to(self.runtimedtype)
+                #
                 return (xmain + zp)
         class MM8_3(module):
             def __init__(self, weight,weight1,weight2, runtimedtype):
@@ -171,9 +171,9 @@ with torch.no_grad():
                 B = y.shape[1]
                 yy = y.to(self.runtimedtype)
                 if B > 1:
-                    xmain = (yy[0]*self.range) @ self.weight.to(self.runtimedtype)
-                    xmain1 = (yy[1]*self.range1) @ self.weight1.to(self.runtimedtype)
-                    xmain2 = (yy[2]*self.range2) @ self.weight2.to(self.runtimedtype)
+                    xmain = ((yy[0]*self.range).to(torch.float16) @ self.weight.to(torch.float16)).to(self.runtimedtype)
+                    xmain1 = ((yy[1]*self.range1).to(torch.float16) @ self.weight1.to(torch.float16)).to(self.runtimedtype)
+                    xmain2 = ((yy[2]*self.range2).to(torch.float16) @ self.weight2.to(torch.float16)).to(self.runtimedtype)
  
                     zp = (y[0].mv(self.offset)).reshape(-1, 1)
                     zp1 = (y[1].mv(self.offset1)).reshape(-1, 1)
@@ -181,13 +181,13 @@ with torch.no_grad():
                     
                      
                     return xmain + zp , xmain1 + zp1, xmain2 + zp2
-                
+                zp = (y[0].mul(self.offset).sum()).to(self.runtimedtype)
+                zp1 = (y[1].mul(self.offset1).sum()).to(self.runtimedtype)
+                zp2 = (y[2].mul(self.offset2).sum()).to(self.runtimedtype)               
                 xmain = self.cuda_mm83(self.N, self.M, yy, self.weight, self.weight1, self.weight2,self.range,self.range1,self.range2)
                 
 
-                zp = (y[0]@self.offset).to(self.runtimedtype)
-                zp1 = (y[1]@self.offset1).to(self.runtimedtype)
-                zp2 = (y[2]@self.offset2).to(self.runtimedtype)
+
                 return (xmain[0] + zp), (xmain[1] + zp1), (xmain[2] + zp2)
         class LayerNorm(module):
             def __init__(self, weight, bias):
@@ -248,8 +248,8 @@ with torch.no_grad():
                 self.ffnmix= torch.stack((w[f"blocks.{i}.ffn.time_mix_k"].squeeze(),
                     w[f"blocks.{i}.ffn.time_mix_r"].squeeze())).to(runtimedtype).to (
                     device=device).unsqueeze(1)
-                self.attreceptance = MM8(
-                    w[f"blocks.{i}.att.receptance.weight"], runtimedtype)
+                torch.cuda.empty_cache()
+                print("Memory allocated after layer: "+str(i), torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
             @method
             def cuda_wkv(self, T: int, C: int, w, u, k, v, aa, bb, pp):
                 assert 1 * C % min(C, 32) == 0
@@ -311,10 +311,11 @@ with torch.no_grad():
         class RwkvEmb (torch.nn.Module):
             def __init__(self,w) -> None:
                 super().__init__()
-                self.w = w.to (
-                    device=device)
-                self.device = device
+                
+                # self.device = device
                 self.stordev = "cpu"
+                self.w = w.to (
+                    device=self.stordev)
                 self.rundev = device
                 self.runtimedtype = runtimedtype
             def forward(self,x):
@@ -358,6 +359,8 @@ with torch.no_grad():
 
                 self.head = MM8(
                     w["head.weight"], runtimedtype)
+                
+                print("Memory allocated before layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
                 # loading bar
                 from tqdm import tqdm
                 self.blocks = torch.nn.ModuleList([Block(dims,w, i) for i in tqdm(range(layers), desc="loading layers")])
@@ -366,9 +369,8 @@ with torch.no_grad():
 
                 self.device = device
 
-                # del w
-                # torch.cuda.empty_cache()
-                # gc.collect()
+                del w
+                torch.cuda.empty_cache()
             @ method
             def forward(self, x, state):
                 
