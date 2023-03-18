@@ -38,7 +38,7 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
                 urllib.request.urlretrieve(path, fileName)
             path = fileName
     
-    if mode == FASTQUANT or path.endswith(".rwkv"):
+    if (mode == FASTQUANT or path.endswith(".rwkv")) and (kwargs.get("strategy", None) is None):
         from rwkvstic.agnostic.backends.opt import OptRWKV
         model = OptRWKV(path, **kwargs)
         import torch
