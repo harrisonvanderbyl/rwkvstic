@@ -55,7 +55,7 @@ print(output)
 
 ## RWKV wrapper
 
-# You can use any compatible rwkv strategy string to overwrite the default behavior with the original BlinkDL package
+### You can use any compatible rwkv strategy string to overwrite the default behavior with the original BlinkDL package
 
 ```
 model = RWKV(
@@ -66,9 +66,9 @@ model = RWKV(
 
 ## Exporting
 
-# You can export the default FASTQUANT mode for quick downloading and loading, as it has a smaller file size and uses less Ram and Disk Space
+### You can export the default FASTQUANT mode for quick downloading and loading, as it has a smaller file size and uses less Ram and Disk Space
 
-```
+```py
 model = RWKV(
     "https://huggingface.co/BlinkDL/rwkv-4-pile-3b/resolve/main/RWKV-4-Pile-3B-Instruct-test1-20230124.pth",
     export="myfilename"
@@ -77,7 +77,7 @@ model = RWKV(
 # exported model as myfilename.rwkv
 ```
 
-```
+```py
 model = RWKV(
     "myfile.rwkv",
 )
