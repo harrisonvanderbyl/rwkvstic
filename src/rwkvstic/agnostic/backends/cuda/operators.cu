@@ -95,7 +95,7 @@ void cuda_mm8_seq(int B, int N, int M,
         (y), y_stride,(r));
 }
 
-#define MM8_ONE_JSPLIT 64
+#define MM8_ONE_JSPLIT 24
 #define MM8_ONE_TILE 1024
 
 __global__ void kernel_mm8_one(
