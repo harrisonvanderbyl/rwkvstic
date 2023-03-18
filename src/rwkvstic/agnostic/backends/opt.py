@@ -313,7 +313,7 @@ with torch.no_grad():
                 # self.device = device
                 self.stordev = "cpu"
                 self.w = w.to (
-                    device=self.stordev)
+                    device=self.stordev).clone()
                 self.rundev = device
                 self.runtimedtype = runtimedtype
             def forward(self,x):
@@ -323,7 +323,7 @@ with torch.no_grad():
             
         class myRWKV(torch.nn.Module):
 
-            def __init__(self,path):
+            def __init__(self,w,dims,layers):
                 super(myRWKV, self).__init__()
                 print("Legacy RWKV")
                 
@@ -331,13 +331,11 @@ with torch.no_grad():
                 self.dtype = dtype
                 self.runtimedtype = runtimedtype
 
-                w = torch.load(path, map_location="cpu")
+                
 
-                dims = w["blocks.0.att.key.weight"].shape[0]
+               
                 # head = 50277
-                layers = len(
-                    list(filter(lambda x: "blocks" in x and "ln1.bias" in x, w.keys())))
-
+                
                 self.emptyState = torch.tensor(
                     layers * [[[0]*dims]*4+[[-1e30]*dims]], device=device, dtype=runtimedtype)
 
@@ -367,8 +365,6 @@ with torch.no_grad():
 
                 self.device = device
 
-                del w
-                torch.cuda.empty_cache()
             @ method
             def forward(self, x, state):
                 
@@ -391,8 +387,15 @@ with torch.no_grad():
             myrwkv = torch.jit.load(path)
             returnObject: myRWKV = myrwkv
             return returnObject
+        w = torch.load(path, map_location="cpu")
+        dims = len(w["blocks.0.att.key.weight"])
+        layers = len(
+            list(filter(lambda x: "blocks" in x and "ln1.bias" in x, w.keys())))
+
+        myrwkv = myRWKV(w,dims,layers)
+        del w
+        myrwkv.eval()
         
-        myrwkv = myRWKV(path)
         
         if jit:
             myrwkv = torch.jit.script(myrwkv)
