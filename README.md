@@ -9,6 +9,10 @@ When using BlinkDLs pretrained models, it would advised to have the `torch` pack
 Some options, when left blank, will elicit a prompt asking you to choose a value.
 for this purpose, please ensure you have the `inquirer` package installed.
 
+## Note, as of RWKVSTIC 2.0, the default mode is GPU with FASTQUANT, my own custom implementation of strategy="cuda fp32i8".
+
+# Please checkout the strategy section on [RWKV](https://pypi.org/project/rwkv/) for other strategies, or look at the advanced modes below.
+
 ## Tables and graphs
 
 ### Rwkv-4 models -> recomended vram
@@ -46,6 +50,37 @@ print(output)
 
 # Q: who is Jim Butcher?
 # A: Jim Butcher is a very popular American author of fantasy novels. He’s known for the Dresden Files series of novels.<|endoftext|>
+```
+
+## RWKV wrapper
+
+# You can use any compatible rwkv strategy string to overwrite the default behavior with the original BlinkDL package
+
+```
+model = RWKV(
+    "https://huggingface.co/BlinkDL/rwkv-4-pile-3b/resolve/main/RWKV-4-Pile-3B-Instruct-test1-20230124.pth",
+    strategy="cuda fp32"
+)
+```
+
+## Exporting
+
+# You can export the default FASTQUANT mode for quick downloading and loading, as it has a smaller file size and uses less Ram and Disk Space
+
+```
+model = RWKV(
+    "https://huggingface.co/BlinkDL/rwkv-4-pile-3b/resolve/main/RWKV-4-Pile-3B-Instruct-test1-20230124.pth",
+    export="myfilename"
+)
+
+# exported model as myfilename.rwkv
+```
+
+```
+model = RWKV(
+    "myfile.rwkv",
+)
+
 ```
 
 ## Advanced Usage
