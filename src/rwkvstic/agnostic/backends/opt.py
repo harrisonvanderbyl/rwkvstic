@@ -12,14 +12,12 @@ import gc
 import os
 current_path = os.path.dirname(os.path.abspath(__file__))
 
-# method = torch.jit.script_method
-# module = torch.jit.ScriptModule
-# script = torch.jit.script
-method = lambda x:x #.script_method
-module = torch.nn.Module #.ScriptModule
-script = lambda x:x #.script
+method = torch.jit.script_method
+module = torch.jit.ScriptModule
+script = torch.jit.script
 with torch.no_grad():
     def OptRWKV(path, jit=True, export=False, **kwargs):
+      
 
         device = "cuda"
 
