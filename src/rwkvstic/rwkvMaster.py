@@ -120,5 +120,5 @@ class RWKVMaster():
         return self.myState, self.lastToken
 
     def resetState(self):
-        self.myState = self.emptyState
-        self.lastToken = 187
+        self.myState = self.emptyState.clone()
+        self.lastToken = [187]
