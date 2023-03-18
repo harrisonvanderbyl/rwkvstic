@@ -9,9 +9,10 @@ When using BlinkDLs pretrained models, it would advised to have the `torch` pack
 Some options, when left blank, will elicit a prompt asking you to choose a value.
 for this purpose, please ensure you have the `inquirer` package installed.
 
-## Note, as of RWKVSTIC 2.0, the default mode is GPU with FASTQUANT, my own custom implementation of strategy="cuda fp32i8".
+## Note
+### as of RWKVSTIC 2.0, the default mode is GPU with FASTQUANT, my own custom implementation of strategy="cuda fp32i8".
 
-# Please checkout the strategy section on [RWKV](https://pypi.org/project/rwkv/) for other strategies, or look at the advanced modes below.
+### Please checkout the strategy section on [RWKV](https://pypi.org/project/rwkv/) for other strategies, or look at the advanced modes below.
 
 ## Tables and graphs
 
