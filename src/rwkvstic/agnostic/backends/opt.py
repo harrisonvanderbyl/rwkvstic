@@ -400,7 +400,7 @@ with torch.no_grad():
             myrwkv = torch.jit.script(myrwkv)
         if export:
             torch.jit.save(myrwkv, export+".rwkv")
-            returnObject: myRWKV = myrwkv
+            
             exit()
-
+        returnObject: myRWKV = myrwkv
         return returnObject
