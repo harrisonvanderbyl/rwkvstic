@@ -18,7 +18,7 @@ classifiers = [
 dependencies = [
   'tokenizers >= 0.13.2',
   'rwkv',
-  'ninja'.
+  'ninja',
   'tqdm',
   'numpy',
 ]
