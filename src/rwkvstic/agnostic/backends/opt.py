@@ -19,7 +19,7 @@ method = lambda x:x #.script_method
 module = torch.nn.Module #.ScriptModule
 script = lambda x:x #.script
 with torch.no_grad():
-    def OptRWKV(path):
+    def OptRWKV(path, jit=True, export=False, **kwargs):
 
         device = "cuda"
 
@@ -389,20 +389,18 @@ with torch.no_grad():
 
                 return outx, state
             
-        if path.endswith(".pt"):
+        if path.endswith(".rwkv"):
             myrwkv = torch.jit.load(path)
             returnObject: myRWKV = myrwkv
             return returnObject
         
         myrwkv = myRWKV(path)
         
-        # print the memory used in gb
-        print("Memory used: ", torch.cuda.memory_allocated()/1024**3, "GB")
-
-        myrwkv = torch.jit.script(myrwkv)
-        print("Memory used: ", torch.cuda.memory_allocated()/1024**3, "GB")
-
-        # torch.jit.save(myrwkv, "myrwkv.pt")
-        returnObject: myRWKV = myrwkv
+        if jit:
+            myrwkv = torch.jit.script(myrwkv)
+        if export:
+            torch.jit.save(myrwkv, export+".rwkv")
+            returnObject: myRWKV = myrwkv
+            exit()
 
         return returnObject

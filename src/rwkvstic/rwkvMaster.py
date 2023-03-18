@@ -7,36 +7,7 @@ from typing import List
 import time
 
 
-def loadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
-    tt = time.time()
-    nnewctx = newctx
-    ll = len(newctx)
-    btch = 1
-    o = (None, statex)
 
-    while len(newctx) > 0:
-        print(len(newctx)/ll * 100, "%", "remaining")
-        m = newctx[:btch]
-        newctx = newctx[btch:]
-        o = model.forward(m, o[1])
-        progressCallBack(m)
-        
-
-    # print("loaded context in", time.time()-tt, "seconds")
-    # print(o[0][0])
-    return nnewctx, o[1]
-
-
-def rnnloadContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
-
-    for i in tqdm.tqdm(range(len(newctx))):
-
-        x = ctx+newctx[:i]
-
-        o = model.forward([x[-1]], statex)
-        statex = o[1]
-        progressCallBack(x)
-    return ctx+newctx, o[1]
 
 
 class RWKVMaster():
@@ -83,17 +54,50 @@ class RWKVMaster():
 
         return {"logits": logits, "state": ostate, "output": sampled}
 
-    def loadContext(self, newctx: str = "", ctx: str = "\n\n", statex=None, progressCallBack=lambda x: x):
+    def loadContext(self, newctx: str = "", ctx: str = "\n\n", statex=None, progressCallBack=lambda x: x, batch=20):
+
+        def doContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
+            tt = time.time()
+            nnewctx = newctx
+            ll = len(newctx)
+            btch = batch
+            o = (None, statex)
+
+            while len(newctx) > 0:
+                print(len(newctx)/ll * 100, "%", "remaining")
+                m = newctx[:btch]
+                newctx = newctx[btch:]
+                o = model.forward(m, o[1])
+                progressCallBack(m)
+                
+
+            # print("loaded context in", time.time()-tt, "seconds")
+            # print(o[0][0])
+            return nnewctx, o[1]
+
+
+        def rnndoContext(model, ctx, newctx, statex, progressCallBack=lambda x: x):
+
+            for i in tqdm.tqdm(range(len(newctx))):
+
+                x = ctx+newctx[:i]
+
+                o = model.forward([x[-1]], statex)
+                statex = o[1]
+                progressCallBack(x)
+            return ctx+newctx, o[1]
+
+
         statex = self.myState if statex is None else statex
         # print(newctx)
         ctx = self.tokenizer.encode(ctx)
         newctx = self.tokenizer.encode(newctx)
         self.lastToken = [ctx[-1]]
         if self.model.__dict__.get("RnnOnly", False):
-            ctx, state = rnnloadContext(
+            ctx, state = rnndoContext(
                 self.model, ctx, self.intTensor(newctx), statex, progressCallBack)
         else:
-            ctx, state = loadContext(
+            ctx, state = doContext(
                 self.model, ctx, self.intTensor(newctx), statex, progressCallBack)
         
         self.myState = state

@@ -10,11 +10,11 @@ from typing import Tuple
 import inquirer
 import os
 import urllib.request
-
+from rwkvstic.agnostic.backends import FASTQUANT
 # set torch threads to 8
 
 
-def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwargs) -> RWKVMaster:
+def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, **kwargs) -> RWKVMaster:
 
     if (path == None):
         files = os.listdir()
@@ -38,9 +38,9 @@ def RWKV(path=None, mode: Tuple[str, None] = None, *args, tokenizer=None, **kwar
                 urllib.request.urlretrieve(path, fileName)
             path = fileName
     
-    if kwargs.get("opt",False):
+    if mode == FASTQUANT or path.endswith(".rwkv"):
         from rwkvstic.agnostic.backends.opt import OptRWKV
-        model = OptRWKV(path)
+        model = OptRWKV(path, **kwargs)
         import torch
         from rwkvstic.agnostic.samplers.numpy import npsample
         return RWKVMaster(model, model.emptyState, torch.tensor, torch.LongTensor, npsample, tokenizer)
