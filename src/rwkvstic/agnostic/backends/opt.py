@@ -34,7 +34,7 @@ with torch.no_grad():
             sources=[f"{current_path}/cuda/wrapper.cpp",
                     f"{current_path}/cuda/operators.cu"],
             verbose=False,
-            extra_cuda_cflags=["-std=c++17", "-O3" ] + (["-gencode", "arch=compute_75,code=sm_75"] if torch.cuda.get_device_capability(0)[0] >= 7 else []) + (["-gencode", "arch=compute_80,code=sm_80"] if torch.cuda.get_device_capability(0)[0] >= 8 else []) + (["-gencode", "arch=compute_86,code=sm_86"] if torch.cuda.get_device_capability(0)[0] >= 8 else []),
+            extra_cuda_cflags=["-std=c++17", "-O3" ],
             
             is_python_module=False)
         

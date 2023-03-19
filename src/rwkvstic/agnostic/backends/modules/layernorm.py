@@ -2,11 +2,12 @@
 from rwkvstic.agnostic.backends.modules.base import RwkvModule
 import torch
 class LayerNorm(RwkvModule):
-    def __init__(self, weight, bias, device):
+    def __init__(self, weight, bias, device, dtype = torch.float32):
         super(LayerNorm, self).__init__()
 
         self.weight = weight.float().clone().to( device )
         self.bias = bias.float().clone().to( device )
+        self.device = device
         self.subattributes = ["weight", "bias"]
     @ torch.jit.script_method
     def forward(self, y):

@@ -2,16 +2,11 @@
 from rwkvstic.agnostic.backends.modules.base import RwkvModule
 import torch
 class MM8(RwkvModule):
-            def __init__(self, weight, device, maxVram):
+            def __init__(self, weight, device, maxVram,dtype = torch.float32):
                 
                 super(MM8, self).__init__()
-                self.runtimedtype = torch.float32
-                
-
-                
-
-                
-                
+                self.runtimedtype = dtype
+ 
                 self.weight, self.range, self.offset = self.chunkQuantizeMatrix(weight,device=device, maxvram=maxVram)
                 
                 
@@ -71,14 +66,14 @@ class MM8(RwkvModule):
                 B = y.shape[0]
                 yy = y.to(self.runtimedtype)
                 if B > 1:
-                    xmain = (yy*self.range).to(torch.float16) @ self.weight.to(dtype=torch.float16,device=self.device)
+                    xmain = (yy*self.range).to(torch.bfloat16) @ self.weight.to(dtype=torch.bfloat16,device=self.device)
                     xmain = xmain.to(self.runtimedtype)
                     zp = (y.mv(self.offset)).reshape(-1, 1)
                     
                      
                     return xmain + zp 
                 zp = (y.mul(self.offset).sum()).to(self.runtimedtype)
-                xmain = self.cuda_mm8(self.N, self.M, yy, self.weight.to(self.device),self.range).to(self.runtimedtype)
+                xmain = self.cuda_mm8(self.N, self.M, yy.to(self.runtimedtype), self.weight.to(self.device),self.range.to(self.runtimedtype)).to(self.runtimedtype)
                 
 
                 #
@@ -88,12 +83,13 @@ class MM8(RwkvModule):
             
                 
 class MM8_3(MM8):
-            def __init__(self, weight,weight1,weight2, device, maxVram):
+            def __init__(self, weight,weight1,weight2, device, maxVram,dtype = torch.float32):
                 
                 super(MM8_3, self).__init__(
                      weight,
                         device,
-                        maxVram
+                        maxVram,
+                        dtype = dtype
                 )
 
                 self.weight1, self.range1, self.offset1 = self.chunkQuantizeMatrix(weight1,device=device, maxvram=maxVram)
@@ -134,9 +130,9 @@ class MM8_3(MM8):
                 B = y.shape[1]
                 yy = y.to(self.runtimedtype)
                 if B > 1:
-                    xmain = ((yy[0]*self.range).to(torch.float16) @ self.weight.to(self.device).to(torch.float16)).to(self.runtimedtype)
-                    xmain1 = ((yy[1]*self.range1).to(torch.float16) @ self.weight1.to(self.device).to(torch.float16)).to(self.runtimedtype)
-                    xmain2 = ((yy[2]*self.range2).to(torch.float16) @ self.weight2.to(self.device).to(torch.float16)).to(self.runtimedtype)
+                    xmain = ((yy[0]*self.range).to(torch.bfloat16) @ self.weight.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
+                    xmain1 = ((yy[1]*self.range1).to(torch.bfloat16) @ self.weight1.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
+                    xmain2 = ((yy[2]*self.range2).to(torch.bfloat16) @ self.weight2.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
  
                     zp = (y[0].mv(self.offset)).reshape(-1, 1)
                     zp1 = (y[1].mv(self.offset1)).reshape(-1, 1)
