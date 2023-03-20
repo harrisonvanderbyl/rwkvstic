@@ -61,15 +61,7 @@ class RWKV(torch.nn.Module):
         return outx
     
 
-    
-
-dims = 256
-layers = 20
-from rwkvstic.tokenizer import tokenizer
-t = tokenizer()
-myrwkv = RWKV(dims,layers, head = 140, T=100)
-
-# open text file
+ #open text file
 with open("/home/harrison/Desktop/rwkvstic/src/rwkvstic/training/data/t8.shakespeare.txt", "r") as f:
     text = f.read()
 
@@ -78,26 +70,45 @@ data = [ord(i) for i in text]
 print (data[:100])
 print(max(data))
 
+
+dims = 128
+layers = 5
+ctx = 100
+head = max(data)+1
+
+from rwkvstic.tokenizer import tokenizer
+t = tokenizer()
+myrwkv = RWKV(dims,layers, head, ctx)
+
+#
 myrwkv.to("cuda")
 myrwkv.train()
 for x in myrwkv.parameters():
     x.requires_grad = True
 
-for epoch in range(len(data)//100):
+for epoch in range(len(data)//ctx):
     
-    out = myrwkv.forward(torch.LongTensor(data[epoch*100:epoch*100+100]).to(torch.int64).to("cuda"))
-    print(out)
+    out = myrwkv.forward(torch.LongTensor(data[epoch*ctx:epoch*ctx+ctx]).to(torch.int64).to("cuda"))
+    # print(out)
 
     loss = torch.nn.CrossEntropyLoss()
-    m = loss(out, (torch.LongTensor(data[epoch*100+1:epoch*100+101]).to(torch.int64).to("cuda")))
-    print(m)
+    m = loss(out, (torch.LongTensor(data[epoch*ctx+1:epoch*ctx+ctx+1]).to(torch.int64).to("cuda")))
+    if epoch%100==0:
+        print(m)
     m.backward()
-    
-    
-
-    # update parameters
-    optimizer = torch.optim.Adam(myrwkv.parameters(), lr=0.1/(1+epoch/100))
+        # update parameters
+    optimizer = torch.optim.Adam(myrwkv.parameters(), lr=0.001)
     optimizer.step()
+
+    if epoch%1000==0:
+        test = data[epoch*ctx:epoch*ctx+ctx]
+        for i in range(50):
+            logits = myrwkv.forward(torch.LongTensor(test).to(torch.int64).to("cuda"))
+            test.append(torch.argmax(logits[-1]).item())
+            test = test[1:]
+        print("".join([chr(i) for i in test]))
+
+
 
 
 

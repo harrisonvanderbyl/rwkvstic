@@ -23,13 +23,27 @@ __global__ void kernel_wkv_forward(const int B, const int T, const int C,
     float pp = _pp[_state_offset];
     for (int i = 0; i < T; i++) {
         const int ii = i * C;
-        const float kk = exp(k[ii] + u);
-        const float vv = v[ii];
-        const float wr1 = aa + kk * vv;
-        const float wr2 = bb + kk;
-        y[ii] = wr1 / wr2;
-        aa = (exp(w)*aa) + exp(w+k[ii]) * vv;
-        bb = (exp(w)*bb) + exp(w+k[ii]);
+        // const float kk = exp(k[ii] + u);
+        // const float vv = v[ii];
+        // const float wr1 = aa + kk * vv;
+        // const float wr2 = bb + kk;
+        // y[ii] = wr1 / wr2;
+        // aa = (exp(w)*aa) + exp(w+k[ii]) * vv;
+        // bb = (exp(w)*bb) + exp(w+k[ii]);
+        const float kk = float(k[ii]);
+        const float vv = float(v[ii]);
+        float ww = u + kk;
+        float p = max(pp, ww);
+        float e1 = exp(pp - p);
+        float e2 = exp(ww - p);
+        y[ii] = ((e1 * aa + e2 * vv) / (e1 * bb + e2));
+        ww = w + pp;
+        p = max(ww, kk);
+        e1 = exp(ww - p);
+        e2 = exp(kk - p);
+        aa = e1 * aa + e2 * vv;
+        bb = e1 * bb + e2;
+        pp = p;
 
     }
     _aa[_state_offset] = aa;
@@ -57,19 +71,34 @@ __global__ void kernel_wkv_forward(const int B, const int T, const int C,
     for (int i = 0; i < T; i++) {
         const int ii = i * C;
 
-        const double kk = exp(k[ii] + u);
-        const double vv = v[ii];
-        const double wr1 = aa + kk * vv;
-        const double wr2 = bb + kk;
-        y[ii] = wr1 / wr2;
-        aa = (exp(w)*aa) + exp(w+k[ii]) * vv;
-        bb = (exp(w)*bb) + exp(w+k[ii]);
+        // const double kk = exp(k[ii] + u);
+        // const double vv = v[ii];
+        // const double wr1 = aa + kk * vv;
+        // const double wr2 = bb + kk;
+        // y[ii] = wr1 / wr2;
+        // aa = (exp(w)*aa) + exp(w+k[ii]) * vv;
+        // bb = (exp(w)*bb) + exp(w+k[ii]);
+        const double kk = double(k[ii]);
+        const double vv = double(v[ii]);
+        double ww = u + kk;
+        double p = max(pp, ww);
+        double e1 = exp(pp - p);
+        double e2 = exp(ww - p);
+        y[ii] = ((e1 * aa + e2 * vv) / (e1 * bb + e2));
+        ww = w + pp;
+        p = max(ww, kk);
+        e1 = exp(ww - p);
+        e2 = exp(kk - p);
+        aa = e1 * aa + e2 * vv;
+        bb = e1 * bb + e2;
+        pp = p;
 
     }
     _aa[_state_offset] = aa;
     _bb[_state_offset] = bb;
     _pp[_state_offset] = pp;
 }
+
 void cuda_wkv_forward(int B, int T, int C, double *w, double *u, double *k, double *v, double *y, double *aa, double *bb, double *pp) {
     dim3 threadsPerBlock( min(C, 32) );
     assert(B * C % threadsPerBlock.x == 0);
