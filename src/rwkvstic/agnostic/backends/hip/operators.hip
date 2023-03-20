@@ -25,20 +25,15 @@ __global__ void kernel_wkv_forward(const int B, const int T, const int C,
     float pp = _pp[_state_offset];
     for (int i = 0; i < T; i++) {
         const int ii = i * C;
-        const float kk = float(k[ii]);
-        const float vv = float(v[ii]);
-        float ww = u + kk;
-        float p = max(pp, ww);
-        float e1 = exp(pp - p);
-        float e2 = exp(ww - p);
-        y[ii] = ((e1 * aa + e2 * vv) / (e1 * bb + e2));
-        ww = w + pp;
-        p = max(ww, kk);
-        e1 = exp(ww - p);
-        e2 = exp(kk - p);
-        aa = e1 * aa + e2 * vv;
-        bb = e1 * bb + e2;
-        pp = p;
+        const float kk = exp(k[ii]);
+        const float vv = v[ii];
+        
+        const float wr1 =  aa + (kk * vv * exp(u));
+        const float wr2 = bb + (kk * exp(u));
+        y[ii] = wr1 / wr2;
+        aa = (vv * kk + aa)* exp(w);
+        bb = (kk + bb)* exp(w);
+
     }
     _aa[_state_offset] = aa;
     _bb[_state_offset] = bb;
@@ -64,20 +59,14 @@ __global__ void kernel_wkv_forward(const int B, const int T, const int C,
     double pp = _pp[_state_offset];
     for (int i = 0; i < T; i++) {
         const int ii = i * C;
-        const double kk = double(k[ii]);
-        const double vv = double(v[ii]);
-        double ww = u + kk;
-        double p = max(pp, ww);
-        double e1 = exp(pp - p);
-        double e2 = exp(ww - p);
-        y[ii] = ((e1 * aa + e2 * vv) / (e1 * bb + e2));
-        ww = w + pp;
-        p = max(ww, kk);
-        e1 = exp(ww - p);
-        e2 = exp(kk - p);
-        aa = e1 * aa + e2 * vv;
-        bb = e1 * bb + e2;
-        pp = p;
+
+        const double kk = exp(k[ii]);
+        const double vv = v[ii];
+        const double wr1 =  aa + (kk * vv * exp(u));
+        const double wr2 = bb + (kk * exp(u));
+        y[ii] = wr1 / wr2;
+        aa = (vv * kk + aa) * exp(w);
+        bb = (kk + bb) * exp(w);
     }
     _aa[_state_offset] = aa;
     _bb[_state_offset] = bb;
@@ -99,7 +88,7 @@ void cuda_wkv_forward(int B, int T, int C, float *w, float *u, float *k, float *
 
 
 #define MM8_ONE_JSPLIT 24
-#define MM8_ONE_TILE 1024
+#define MM8_ONE_TILE 512
 
 
 __global__ void kernel_mm8_one(
