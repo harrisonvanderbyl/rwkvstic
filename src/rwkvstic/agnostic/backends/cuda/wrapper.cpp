@@ -1,37 +1,15 @@
 #include <torch/extension.h>
 #include "ATen/ATen.h"
 #include <iostream>
-// make generic type of fp16 or fp32
-#define fp16 at::Half
 
+// generic T either float or fp16 or fp64
 
-
-
-void cuda_mm8_one(int N, int M,
-                  fp16 *x,
-                  uint8_t *w, int w_stride,
-                  fp16 *y,
-                    fp16 *r
-                    );
-void cuda_mm8_three(int N, int M,
-                    fp16 *x,
-                    fp16 *x1,
-                    fp16 *x2,
-                    uint8_t *w, int w_stride,
-                    uint8_t *w1, int w1_stride,
-                    uint8_t *w2, int w2_stride,
-                    fp16 *y,
-                    fp16 *y1,
-                    fp16 *y2,
-                    fp16 *r, fp16 *r1, fp16 *r2
-                    );
 void cuda_mm8_one(int N, int M,
                   float *x,
                   uint8_t *w, int w_stride,
                   float *y,
                     float *r
                     );
-                    
 void cuda_mm8_three(int N, int M,
                     float *x,
                     float *x1,
@@ -44,9 +22,42 @@ void cuda_mm8_three(int N, int M,
                     float *y2,
                     float *r, float *r1, float *r2
                     );
-void cuda_wkv_forward(int B, int T, int C, float *w, float *u, fp16 *k, fp16 *v, fp16 *y, float *aa, float *bb, float *pp);
+                    void cuda_mm8_one(int N, int M,
+                  float *x,
+                  uint8_t *w, int w_stride,
+                  float *y,
+                    float *r
+                    );
+void cuda_mm8_three(int N, int M,
+                    double *x,
+                    double *x1,
+                    double *x2,
+                    uint8_t *w, int w_stride,
+                    uint8_t *w1, int w1_stride,
+                    uint8_t *w2, int w2_stride,
+                    double *y,
+                    double *y1,
+                    double *y2,
+                    double *r, double *r1, double *r2
+                    );
+void cuda_mm8_one(int N, int M,
+                  double *x,
+                  uint8_t *w, int w_stride,
+                  double *y,
+                    double *r
+                    );
+void cuda_wkv_forward(int B, int T, int C, float *w, float *u, float *k, float *v, float *y, float *aa, float *bb, float *pp);
+void cuda_wkv_forward(int B, int T, int C, double *w, double *u, double *k, double *v, double *y, double *aa, double *bb, double *pp);
 void wkv_forward(int64_t B, int64_t T, int64_t C, torch::Tensor &w, torch::Tensor &u, torch::Tensor &k, torch::Tensor &v, torch::Tensor &y, torch::Tensor &aa, torch::Tensor &bb, torch::Tensor &pp) {
-    cuda_wkv_forward(B, T, C, w.data_ptr<float>(), u.data_ptr<float>(), k.data_ptr<fp16>(), v.data_ptr<fp16>(), y.data_ptr<fp16>(), aa.data_ptr<float>(), bb.data_ptr<float>(), pp.data_ptr<float>());
+    
+    if (w.scalar_type() == torch::kFloat)
+    {
+        cuda_wkv_forward(B, T, C, w.data_ptr<float>(), u.data_ptr<float>(), k.data_ptr<float>(), v.data_ptr<float>(), y.data_ptr<float>(), aa.data_ptr<float>(), bb.data_ptr<float>(), pp.data_ptr<float>());
+    }
+    else if (w.scalar_type() == torch::kDouble)
+    {
+        cuda_wkv_forward(B, T, C, w.data_ptr<double>(), u.data_ptr<double>(), k.data_ptr<double>(), v.data_ptr<double>(), y.data_ptr<double>(), aa.data_ptr<double>(), bb.data_ptr<double>(), pp.data_ptr<double>());
+    }
 }
 
 void mm8_one(int64_t N, int64_t M,
@@ -57,15 +68,7 @@ void mm8_one(int64_t N, int64_t M,
     assert(y.stride(0) == 1);
     assert(x.scalar_type() == y.scalar_type() && x.scalar_type() == r.scalar_type());
 
-    if (x.scalar_type() == torch::kHalf) {
-        cuda_mm8_one(
-        N, M,
-        x.data_ptr<fp16>(),
-        w.data_ptr<uint8_t>(), w.stride(0),
-        y.data_ptr<fp16>(),
-        r.data_ptr<fp16>()
-        );
-    } else if (x.scalar_type() == torch::kFloat)
+    if (x.scalar_type() == torch::kFloat)
     {
         cuda_mm8_one(
         N, M,
@@ -75,6 +78,15 @@ void mm8_one(int64_t N, int64_t M,
         r.data_ptr<float>()
         );
 
+    } else if (x.scalar_type() == torch::kDouble)
+    {
+        cuda_mm8_one(
+        N, M,
+        x.data_ptr<double>(),
+        w.data_ptr<uint8_t>(), w.stride(0),
+        y.data_ptr<double>(),
+        r.data_ptr<double>()
+        );
     }
     
 
@@ -96,21 +108,7 @@ void mm8_three(int64_t N, int64_t M,
     assert(y1.stride(0) == 1);
     assert(y2.stride(0) == 1);
     assert(x.scalar_type() == y.scalar_type() && x.scalar_type() == r.scalar_type());
-    if (x.scalar_type() == torch::kHalf) {
-        cuda_mm8_three(
-        N, M,
-        x.data_ptr<fp16>(),
-        x1.data_ptr<fp16>(),
-        x2.data_ptr<fp16>(),
-        w.data_ptr<uint8_t>(), w.stride(0),
-        w1.data_ptr<uint8_t>(), w1.stride(0),
-        w2.data_ptr<uint8_t>(), w2.stride(0),
-        y.data_ptr<fp16>(),
-        y1.data_ptr<fp16>(),
-        y2.data_ptr<fp16>(),
-        r.data_ptr<fp16>(), r1.data_ptr<fp16>(), r2.data_ptr<fp16>()
-        );
-    } else if (x.scalar_type() == torch::kFloat)
+    if (x.scalar_type() == torch::kFloat)
     {
         cuda_mm8_three(
         N, M,
@@ -124,6 +122,22 @@ void mm8_three(int64_t N, int64_t M,
         y1.data_ptr<float>(),
         y2.data_ptr<float>(),
         r.data_ptr<float>(), r1.data_ptr<float>(), r2.data_ptr<float>()
+        );
+    }
+    else if (x.scalar_type() == torch::kDouble)
+    {
+        cuda_mm8_three(
+        N, M,
+        x.data_ptr<double>(),
+        x1.data_ptr<double>(),
+        x2.data_ptr<double>(),
+        w.data_ptr<uint8_t>(), w.stride(0),
+        w1.data_ptr<uint8_t>(), w1.stride(0),
+        w2.data_ptr<uint8_t>(), w2.stride(0),
+        y.data_ptr<double>(),
+        y1.data_ptr<double>(),
+        y2.data_ptr<double>(),
+        r.data_ptr<double>(), r1.data_ptr<double>(), r2.data_ptr<double>()
         );
     }
     

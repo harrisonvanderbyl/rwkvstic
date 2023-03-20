@@ -2,10 +2,11 @@
 from rwkvstic.agnostic.backends.modules.base import RwkvModule
 import torch
 class MM8(RwkvModule):
-            def __init__(self, weight, device, maxVram,dtype = torch.float32):
+            def __init__(self, weight, device, maxVram,runtimedtype = torch.float32, dtype = torch.float64):
                 
                 super(MM8, self).__init__()
-                self.runtimedtype = dtype
+                self.runtimedtype = runtimedtype
+                self.dtype = torch.float32
  
                 self.weight, self.range, self.offset = self.chunkQuantizeMatrix(weight,device=device, maxvram=maxVram)
                 
@@ -31,8 +32,8 @@ class MM8(RwkvModule):
                 splitmatrices = range(splits)
                 xx = [self.QuantizeMatrix(x.t(), m, toset)
                     for m in splitmatrices]
-                mrange = (torch.cat([x[0] for x in xx])).float()
-                offset = (torch.cat([x[1] for x in xx])).float()
+                mrange = (torch.cat([x[0] for x in xx])).to(self.dtype)
+                offset = (torch.cat([x[1] for x in xx])).to(self.runtimedtype)
 
                 return toset, mrange, offset
             def QuantizeMatrix(self, xx, i, toset):
@@ -43,20 +44,21 @@ class MM8(RwkvModule):
                 rang = 255
                 ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
                 toset[start:end] = ((x-mini)/ran).round().t().to(torch.uint8).to(toset.device, non_blocking=True)
-                return [ran.to(self.runtimedtype).clone(), mini.to(self.runtimedtype).clone()]
+                return [ran.to(self.dtype).clone(), mini.to(self.runtimedtype).clone()]
 
             @ torch.jit.script_method
             def cuda_mm8(self, N:int, M:int, x, w, r):
                 # assert B == 1
                 # assert w.dtype == torch.uint8
-                x = x[0]
+                x = x[0].to(self.dtype)
                 # assert x.shape == [M]
                 
                 # assert w.shape == [M, N]
-                y = torch.zeros(N, device=w.device, dtype=self.runtimedtype)
+                y = torch.zeros(N, device=w.device, dtype=self.dtype)
+                r = r.to(self.dtype)
                 torch.ops.rwkv.mm8_one(M,N, x, w, y,r)
-                
-                y = y.to(dtype=self.runtimedtype)
+               
+                y = y.to(self.runtimedtype)
 
                 return y.unsqueeze(0)
 
@@ -64,16 +66,17 @@ class MM8(RwkvModule):
             def forward(self, y):
                 
                 B = y.shape[0]
-                yy = y.to(self.runtimedtype)
+                y = y.to(self.runtimedtype)
+               
                 if B > 1:
-                    xmain = (yy*self.range).to(torch.bfloat16) @ self.weight.to(dtype=torch.bfloat16,device=self.device)
+                    xmain = (y*self.range.to(self.runtimedtype)).to(torch.bfloat16) @ self.weight.to(dtype=torch.bfloat16,device=self.device)
                     xmain = xmain.to(self.runtimedtype)
-                    zp = (y.mv(self.offset)).reshape(-1, 1)
+                    zp = (y.mv(self.offset.to(self.runtimedtype))).reshape(-1, 1)
                     
                      
                     return xmain + zp 
-                zp = (y.mul(self.offset).sum()).to(self.runtimedtype)
-                xmain = self.cuda_mm8(self.N, self.M, yy.to(self.runtimedtype), self.weight.to(self.device),self.range.to(self.runtimedtype)).to(self.runtimedtype)
+                zp = (y.mul(self.offset).sum())
+                xmain = self.cuda_mm8(self.N, self.M, y, self.weight.to(self.device),self.range)
                 
 
                 #
@@ -83,13 +86,14 @@ class MM8(RwkvModule):
             
                 
 class MM8_3(MM8):
-            def __init__(self, weight,weight1,weight2, device, maxVram,dtype = torch.float32):
+            def __init__(self, weight,weight1,weight2, device, maxVram,runtimedtypedtype = torch.float32, dtype = torch.float64):
                 
                 super(MM8_3, self).__init__(
                      weight,
                         device,
                         maxVram,
-                        dtype = dtype
+                        runtimedtypedtype,
+                        dtype
                 )
 
                 self.weight1, self.range1, self.offset1 = self.chunkQuantizeMatrix(weight1,device=device, maxvram=maxVram)
@@ -110,12 +114,12 @@ class MM8_3(MM8):
             @ torch.jit.script_method
             def cuda_mm83(self, N:int, M:int, x, w,w1,w2, r,r1,r2):
             
-                x0 = x[0].squeeze().contiguous()
-                x1 = x[1].squeeze().contiguous()
-                x2 = x[2].squeeze().contiguous()
-                y = torch.zeros(N, device=w.device, dtype=self.runtimedtype)
-                y1 = torch.zeros(N, device=w.device, dtype=self.runtimedtype)
-                y2 = torch.zeros(N, device=w.device, dtype=self.runtimedtype)
+                x0 = x[0].squeeze().contiguous().to(self.dtype)
+                x1 = x[1].squeeze().contiguous().to(self.dtype)
+                x2 = x[2].squeeze().contiguous().to(self.dtype)
+                y = torch.zeros(N, device=w.device, dtype=self.dtype)
+                y1 = torch.zeros(N, device=w.device, dtype=self.dtype)
+                y2 = torch.zeros(N, device=w.device, dtype=self.dtype)
                 torch.ops.rwkv.mm8_three(M,N, x0,x1,x2, w,w1,w2, y,y1,y2,r,r1,r2)
                 
                 y = y.to(dtype=self.runtimedtype)
@@ -128,11 +132,11 @@ class MM8_3(MM8):
             def forward(self, y):
                 
                 B = y.shape[1]
-                yy = y.to(self.runtimedtype)
+                y = y.to(self.runtimedtype)
                 if B > 1:
-                    xmain = ((yy[0]*self.range).to(torch.bfloat16) @ self.weight.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
-                    xmain1 = ((yy[1]*self.range1).to(torch.bfloat16) @ self.weight1.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
-                    xmain2 = ((yy[2]*self.range2).to(torch.bfloat16) @ self.weight2.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
+                    xmain = ((y[0]*self.range.to(self.runtimedtype)).to(torch.bfloat16) @ self.weight.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
+                    xmain1 = ((y[1]*self.range1.to(self.runtimedtype)).to(torch.bfloat16) @ self.weight1.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
+                    xmain2 = ((y[2]*self.range2.to(self.runtimedtype)).to(torch.bfloat16) @ self.weight2.to(self.device).to(torch.bfloat16)).to(self.runtimedtype)
  
                     zp = (y[0].mv(self.offset)).reshape(-1, 1)
                     zp1 = (y[1].mv(self.offset1)).reshape(-1, 1)
@@ -140,10 +144,10 @@ class MM8_3(MM8):
                     
                      
                     return xmain + zp , xmain1 + zp1, xmain2 + zp2
-                zp = (y[0].mul(self.offset).sum()).to(self.runtimedtype)
-                zp1 = (y[1].mul(self.offset1).sum()).to(self.runtimedtype)
-                zp2 = (y[2].mul(self.offset2).sum()).to(self.runtimedtype)               
-                xmain = self.cuda_mm83(self.N, self.M, yy, self.weight.to(self.device), self.weight1.to(self.device), self.weight2.to(self.device),self.range,self.range1,self.range2)
+                zp = (y[0].mul(self.offset).sum())
+                zp1 = (y[1].mul(self.offset1).sum())
+                zp2 = (y[2].mul(self.offset2).sum())             
+                xmain = self.cuda_mm83(self.N, self.M, y, self.weight.to(self.device), self.weight1.to(self.device), self.weight2.to(self.device),self.range,self.range1,self.range2)
                 
 
 

@@ -26,7 +26,7 @@ with torch.no_grad():
         device = "cuda"
 
         dtype = torch.float32
-        runtimedtype = torch.float32
+        runtimedtype = torch.float64
         
 
         load(
@@ -41,7 +41,7 @@ with torch.no_grad():
 
         class myRWKV(RwkvModule):
 
-            def __init__(self,w,dims,layers, device="cuda", maxvram = 100):
+            def __init__(self,w,dims,layers, device="cuda", maxvram = 100, dtype = torch.float32, runtimedtype = torch.float64):
                 super(myRWKV, self).__init__()
                 print("Legacy RWKV")
                 
@@ -61,28 +61,32 @@ with torch.no_grad():
 
                 
                
-                self.emb =  RwkvEmb(w["emb.weight"], device)
+                self.emb =  RwkvEmb(w["emb.weight"], device, runtimedtype)
                 self.ln_out = LayerNorm(
                     w["ln_out.weight"],
                     w["ln_out.bias"],
-                    device=device
+                    device=device, dtype=runtimedtype
                 )
                 self.ln_in = LayerNorm(
                     w["blocks.0.ln0.weight"],
                     w["blocks.0.ln0.bias"],
-                    device=device
+                    device=device, dtype=runtimedtype
                 )
 
                 self.head = MM8(
                     w["head.weight"],
                     device,
-                    maxvram
+                    maxvram,
+                    dtype=dtype
+                    ,
+                    runtimedtype=runtimedtype
+
                 )
                 
                 print("Memory allocated before layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
                 # loading bar
                 from tqdm import tqdm
-                self.blocks = torch.nn.ModuleList([Block(dims,w, i, device,maxvram) for i in tqdm(range(layers), desc="loading layers")])
+                self.blocks = torch.nn.ModuleList([Block(dims,w, i, device,maxvram, dtype,runtimedtype) for i in tqdm(range(layers), desc="loading layers")])
 
 
                 self.device = device
