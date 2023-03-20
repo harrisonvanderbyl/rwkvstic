@@ -42,7 +42,7 @@ class Block(RwkvModule):
                 
                 self.time_first = w[f"blocks.{i}.att.time_first"].squeeze().to(self.runtimedtype).clone().to(device)
 
-                self.time_decay = w[f"blocks.{i}.att.time_decay"].squeeze().double().exp().neg().float().clone().to(device).to(self.runtimedtype)
+                self.time_decay = w[f"blocks.{i}.att.time_decay"].squeeze().double().exp().neg().clone().to(device).to(self.runtimedtype)
 
                 # self.t = [powerTri(self.time_decay, i) for i in range(1, 21)]
 

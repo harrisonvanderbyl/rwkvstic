@@ -23,14 +23,13 @@ __global__ void kernel_wkv_forward(const int B, const int T, const int C,
     float pp = _pp[_state_offset];
     for (int i = 0; i < T; i++) {
         const int ii = i * C;
-        const float kk = exp(k[ii]);
+        const float kk = exp(k[ii] + u);
         const float vv = v[ii];
-        
-        const float wr1 =  aa + (kk * vv * exp(u));
-        const float wr2 = bb + (kk * exp(u));
+        const float wr1 = aa + kk * vv;
+        const float wr2 = bb + kk;
         y[ii] = wr1 / wr2;
-        aa = (vv * kk + aa)* exp(w);
-        bb = (kk + bb)* exp(w);
+        aa = (exp(w)*aa) + exp(w+k[ii]) * vv;
+        bb = (exp(w)*bb) + exp(w+k[ii]);
 
     }
     _aa[_state_offset] = aa;
@@ -58,13 +57,14 @@ __global__ void kernel_wkv_forward(const int B, const int T, const int C,
     for (int i = 0; i < T; i++) {
         const int ii = i * C;
 
-        const double kk = exp(k[ii]);
+        const double kk = exp(k[ii] + u);
         const double vv = v[ii];
-        const double wr1 =  aa + (kk * vv * exp(u));
-        const double wr2 = bb + (kk * exp(u));
+        const double wr1 = aa + kk * vv;
+        const double wr2 = bb + kk;
         y[ii] = wr1 / wr2;
-        aa = (vv * kk + aa) * exp(w);
-        bb = (kk + bb) * exp(w);
+        aa = (exp(w)*aa) + exp(w+k[ii]) * vv;
+        bb = (exp(w)*bb) + exp(w+k[ii]);
+
     }
     _aa[_state_offset] = aa;
     _bb[_state_offset] = bb;
@@ -85,7 +85,7 @@ void cuda_wkv_forward(int B, int T, int C, float *w, float *u, float *k, float *
 
 
 
-#define MM8_ONE_JSPLIT 24
+#define MM8_ONE_JSPLIT 128
 #define MM8_ONE_TILE 512
 
 

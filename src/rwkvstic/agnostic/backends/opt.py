@@ -20,7 +20,7 @@ method = torch.jit.script_method
 module = torch.jit.ScriptModule
 script = torch.jit.script
 with torch.no_grad():
-    def OptRWKV(path, jit=True, export=False, maxvram=100,dtype = torch.float32, runtimedtype = torch.float64, **kwargs):
+    def OptRWKV(path, jit=True, export=False, maxvram=100,dtype = torch.float64, runtimedtype = torch.float64, **kwargs):
       
 
         device = kwargs.get("device", "cuda")
@@ -41,7 +41,7 @@ with torch.no_grad():
 
         class myRWKV(RwkvModule):
 
-            def __init__(self,w,dims,layers, device="cuda", maxvram = 100, dtype = torch.float32, runtimedtype = torch.float64):
+            def __init__(self,w,dims,layers, device="cuda", maxvram = 100, dtype = torch.float64, runtimedtype = torch.float64):
                 super(myRWKV, self).__init__()
                 print("Legacy RWKV")
                 
