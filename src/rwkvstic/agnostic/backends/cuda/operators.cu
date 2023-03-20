@@ -3,10 +3,9 @@
 #include "ATen/ATen.h"
 #include <cuda_fp16.h>
 #define MIN_VALUE (-1e38)
-// typedef at::float fp16;
-#define fp16 float
-//#define DTYPE __half
-#define DTYPE float
+typedef at::Half fp16;
+// #define fp16 union { float ,  at::Half  }
+#define DTYPE __half
 __global__ void kernel_wkv_forward(const int B, const int T, const int C,
                                const float *__restrict__ const _w, const float *__restrict__ const _u, const fp16 *__restrict__ const _k, const fp16 *__restrict__ const _v,
                                fp16 *__restrict__ const _y, float *__restrict__ const _aa, float *__restrict__ const _bb, float *__restrict__ const _pp) {
@@ -58,42 +57,7 @@ DTYPE *cast(fp16 *ptr)
     return reinterpret_cast<DTYPE *>(ptr);
 }
 
-__global__ void kernel_mm8_seq(
-    const int B, const int N, const int M,
-    const fp16 *__restrict__ const x, const int x_stride,
-    const uint8_t *__restrict__ const w, const int w_stride,
-    fp16 *__restrict__ const y, const int y_stride,
-    fp16 *__restrict__ const r
 
-    )
-{
-
-    const int i = blockIdx.x * blockDim.x + threadIdx.x;
-    const int k = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (i < B && k < M)
-    {
-        float y_local = 0;
-        for (int j = 0; j < N; ++j)
-        {
-            y_local +=(x[i * x_stride + j]) * (w[k * w_stride + j] * (r[j]));
-        }
-        y[i * y_stride + k] = (y_local);
-    }
-}
-void cuda_mm8_seq(int B, int N, int M,
-                  fp16 *x, int x_stride,
-                  uint8_t *w, int w_stride,
-                  fp16 *y, int y_stride,
-                    fp16 *r
-                  )
-{
-    dim3 blockSize(1, 128);
-    dim3 gridSize((B + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
-    kernel_mm8_seq<<<gridSize, blockSize>>>(
-        B, N, M, (x), x_stride, w, w_stride,
-        (y), y_stride,(r));
-}
 
 #define MM8_ONE_JSPLIT 24
 #define MM8_ONE_TILE 1024
@@ -121,6 +85,29 @@ __global__ void kernel_mm8_one(
         atomicAdd(reinterpret_cast<DTYPE *>(&y[k]), *reinterpret_cast<DTYPE *>(&y_local));
     }
 }
+__global__ void kernel_mm8_one(
+    const int N, const int M,
+    const float *__restrict__ const x,
+    const uint8_t *__restrict__ const w, const int w_stride,
+    float *__restrict__ const y,
+    const float *__restrict__ const r
+    ){
+
+    const int k = blockIdx.y * blockDim.y + threadIdx.y;
+    const int j0 = min(N, blockIdx.x * ((N + MM8_ONE_JSPLIT - 1) / MM8_ONE_JSPLIT));
+    const int j1 = min(N, (blockIdx.x + 1) * ((N + MM8_ONE_JSPLIT - 1) / MM8_ONE_JSPLIT));
+
+    if (k < M) {
+        float y_local = fp16(0);
+        for (int j = j0; j < j1; ++j) {
+            y_local += x[j] * (
+                (w[j * w_stride + k] * r[j])
+                
+            );
+        }
+        atomicAdd(reinterpret_cast<float *>(&y[k]), *reinterpret_cast<float *>(&y_local));
+    }
+}
 void cuda_mm8_one(int N, int M,
                   fp16 *x,
                   uint8_t *w, int w_stride,
@@ -132,7 +119,58 @@ void cuda_mm8_one(int N, int M,
     kernel_mm8_one<<<gridSize, blockSize>>>(
         N, M, x, w, w_stride,y, r);
 }
+void cuda_mm8_one(int N, int M,
+                  float *x,
+                  uint8_t *w, int w_stride,
+                  float *y,
+                    float *r   
+                ) {
+    dim3 blockSize(1, MM8_ONE_TILE);
+    dim3 gridSize(MM8_ONE_JSPLIT, (M + blockSize.y - 1) / blockSize.y);
+    kernel_mm8_one<<<gridSize, blockSize>>>(
+        N, M, x, w, w_stride,y, r);
+}
 
+__global__ void kernel_mm8_three(
+    const int N, const int M,
+    const float *__restrict__ const x,
+    const float *__restrict__ const x1,
+    const float *__restrict__ const x2,
+    
+    const uint8_t *__restrict__ const w, const int w_stride,
+    const uint8_t *__restrict__ const w1, const int w1_stride,
+    const uint8_t *__restrict__ const w2, const int w2_stride,
+    float *__restrict__ const y,
+    float *__restrict__ const y1,
+    float *__restrict__ const y2,
+    const float *__restrict__ const r,
+    const float *__restrict__ const r1,
+    const float *__restrict__ const r2
+    
+    ){
+
+    const int k = blockIdx.y * blockDim.y + threadIdx.y;
+    const int j0 = min(N, blockIdx.x * ((N + MM8_ONE_JSPLIT - 1) / MM8_ONE_JSPLIT));
+    const int j1 = min(N, (blockIdx.x + 1) * ((N + MM8_ONE_JSPLIT - 1) / MM8_ONE_JSPLIT));
+
+    if (k < M) {
+        float y_local = at::Half(0);
+        float y1_local = at::Half(0);
+        float y2_local = at::Half(0);
+        for (int j = j0; j < j1; ++j) {
+            y_local += x[j] * (
+                (w[j * w_stride + k] * r[j]));
+            y1_local += x1[j] * (
+                (w1[j * w1_stride + k] * r1[j]));
+            y2_local += x2[j] * (
+                (w2[j * w2_stride + k] * r2[j]));
+           
+        }
+        atomicAdd(reinterpret_cast<float *>(&y[k]), *reinterpret_cast<float *>(&y_local));
+        atomicAdd(reinterpret_cast<float *>(&y1[k]), *reinterpret_cast<float *>(&y1_local));
+        atomicAdd(reinterpret_cast<float *>(&y2[k]), *reinterpret_cast<float *>(&y2_local));
+    }
+}
 __global__ void kernel_mm8_three(
     const int N, const int M,
     const fp16 *__restrict__ const x,
@@ -193,3 +231,22 @@ void cuda_mm8_three(int N, int M,
         N, M, x, x1, x2, w, w_stride, w1, w1_stride, w2, w2_stride, y, y1, y2, r, r1, r2);
 }
 
+void cuda_mm8_three(int N, int M,
+                    float *x,
+                    float *x1,
+                    float *x2,
+                    uint8_t *w, int w_stride,
+                    uint8_t *w1, int w1_stride,
+                    uint8_t *w2, int w2_stride,
+                    float *y,
+                    float *y1,
+                    float *y2,
+                    float *r  ,
+                    float *r1,
+                    float *r2 
+                ) {
+    dim3 blockSize(1, MM8_ONE_TILE);
+    dim3 gridSize(MM8_ONE_JSPLIT, (M + blockSize.y - 1) / blockSize.y);
+    kernel_mm8_three<<<gridSize, blockSize>>>(
+        N, M, x, x1, x2, w, w_stride, w1, w1_stride, w2, w2_stride, y, y1, y2, r, r1, r2);
+}
