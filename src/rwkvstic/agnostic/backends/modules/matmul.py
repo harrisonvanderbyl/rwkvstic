@@ -23,17 +23,16 @@ class MM8(RwkvModule):
                 gc.collect()
                 torch.cuda.empty_cache()
 
-            def chunkQuantizeMatrix(self, x, splits=32, device="cuda", maxvram=100):
+            def chunkQuantizeMatrix(self, x, device="cuda", maxvram=100):
                 todev = "cpu"
                 if torch.cuda.memory_allocated(device) / 1024 ** 3 < maxvram:
                          print((torch.cuda.memory_allocated(device) / 1024**3) , "GB allocated")
                          todev = device
                 toset = torch.empty(x.shape[::-1], device=todev, dtype=torch.uint8)
-                splitmatrices = range(splits)
-                xx = [self.QuantizeMatrix(x.t(), m, toset)
-                    for m in splitmatrices]
-                mrange = (torch.cat([x[0] for x in xx])).to(self.dtype)
-                offset = (torch.cat([x[1] for x in xx])).to(self.runtimedtype)
+                
+                xx = self.QuantizeMatrix(x.t(), 0, toset)
+                mrange = xx[0].to(self.dtype)
+                offset = xx[1].to(self.runtimedtype)
 
                 return toset, mrange, offset
             def QuantizeMatrix(self, xx, i, toset):

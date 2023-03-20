@@ -20,13 +20,13 @@ method = torch.jit.script_method
 module = torch.jit.ScriptModule
 script = torch.jit.script
 with torch.no_grad():
-    def OptRWKV(path, jit=True, export=False, maxvram=100, **kwargs):
+    def OptRWKV(path, jit=True, export=False, maxvram=100,dtype = torch.float32, runtimedtype = torch.float64, **kwargs):
       
 
-        device = "cuda"
+        device = kwargs.get("device", "cuda")
 
-        dtype = torch.float32
-        runtimedtype = torch.float64
+        
+        
         
 
         load(
@@ -121,7 +121,7 @@ with torch.no_grad():
         layers = len(
             list(filter(lambda x: "blocks" in x and "ln1.bias" in x, w.keys())))
 
-        myrwkv = myRWKV(w,dims,layers)
+        myrwkv = myRWKV(w,dims,layers, dtype=dtype, runtimedtype=runtimedtype, maxvram=maxvram, device=device)
         del w
         myrwkv.eval()
         
