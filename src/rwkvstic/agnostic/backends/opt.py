@@ -20,7 +20,7 @@ method = torch.jit.script_method
 module = torch.jit.ScriptModule
 script = torch.jit.script
 with torch.no_grad():
-    def OptRWKV(path, jit=True, export=False, maxvram=100,dtype = torch.float64, runtimedtype = torch.float64, **kwargs):
+    def OptRWKV(path, jit=True, export=False, maxvram=100,dtype = torch.float32, runtimedtype = torch.float64, **kwargs):
       
 
         device = kwargs.get("device", "cuda")
@@ -32,7 +32,9 @@ with torch.no_grad():
         load(
             name=f"wkv_cuda",
             sources=[f"{current_path}/cuda/wrapper.cpp",
-                    f"{current_path}/cuda/operators.cu"],
+                    f"{current_path}/cuda/operators.cu",
+                    f"{current_path}/cuda/operators32.cu"
+                    ],
             verbose=False,
             extra_cuda_cflags=["-std=c++17", "-O3" ],
             
