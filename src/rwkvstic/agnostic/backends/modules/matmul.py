@@ -2,11 +2,11 @@
 from rwkvstic.agnostic.backends.modules.base import RwkvModule
 import torch
 class MM8(RwkvModule):
-            def __init__(self, weight, device, maxVram,runtimedtype = torch.float32, dtype = torch.float64):
+            def __init__(self, weight, device, maxVram,runtimedtype = torch.float64, dtype = torch.float64):
                 
                 super(MM8, self).__init__()
                 self.runtimedtype = runtimedtype
-                self.dtype = torch.float32
+                self.dtype = dtype
  
                 self.weight, self.range, self.offset = self.chunkQuantizeMatrix(weight,device=device, maxvram=maxVram)
                 

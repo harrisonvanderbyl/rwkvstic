@@ -48,7 +48,13 @@ with torch.no_grad():
                 self.device = device
                 self.dtype = dtype
                 self.runtimedtype = runtimedtype
+                # self.vocab_pad = (-w["head.weight"].shape[0])%64
+                # print(self.vocab_pad)
+                
+                # import torch.nn.functional as F
+                # pdweight = F.pad(input=w["head.weight"].t(), pad=(0,self.vocab_pad), mode='constant', value=0).t()
 
+                # print(pdweight.shape)
                 
 
                
