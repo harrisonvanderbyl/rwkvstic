@@ -181,7 +181,7 @@ def AgnosticRWKV(ops: module, *args):
                     x, state[i], i)
                 state = self.scatter(state, i, rstate)
 
-            x = self.matvec(self.postprocess2, self.layernorm(self.pop(x).unsqueeze(0), self.postprocess0,
+            x = self.matvec(self.postprocess2, self.layernorm(self.pop(x), self.postprocess0,
                                                               self.postprocess1)).squeeze()
 
             return self.postProcessTensor(x), state

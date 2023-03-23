@@ -197,6 +197,7 @@ class RWKVJaxOps(RWKVOp.module):
                            keepdims=True) + 0.000009999999747378752)
 
             return w*(xee2/x2) + b
+        self.pop = lambda x: x[-1:]
 
         self.layernorm = ln
         self.emptyState = npjax.array(self.emptyState)
