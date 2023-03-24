@@ -7,7 +7,8 @@ from typing import List
 import time
 
 
-
+def clone (x):
+    return x.clone() if hasattr(x, "clone") else x
 
 
 class RWKVMaster():
@@ -17,8 +18,8 @@ class RWKVMaster():
 
         self.tokenizer = tokenizer.tokenizer(tokPath)
 
-        self.emptyState = emptyState.clone()
-        self.myState = emptyState.clone()
+        self.emptyState = clone(emptyState)
+        self.myState = clone(emptyState)
         self.lastToken = [187]
         self.initTensor = initTensor
         self.intTensor = intTensor
@@ -67,7 +68,7 @@ class RWKVMaster():
                 print(len(newctx)/ll * 100, "%", "remaining")
                 m = newctx[:btch]
                 newctx = newctx[btch:]
-                o = model.forward(m, o[1].clone())
+                o = model.forward(m, clone(o[1]))
                 progressCallBack(m)
                 
 
@@ -113,12 +114,12 @@ class RWKVMaster():
         return self.tokenizer.encode(x)
 
     def setState(self, state):
-        self.myState = state[0].clone()
+        self.myState = clone(state[0])
         self.lastToken = state[1]
 
     def getState(self):
-        return self.myState.clone(), self.lastToken
+        return self.clone(myState), self.lastToken
 
     def resetState(self):
-        self.myState = self.emptyState.clone()
+        self.myState = self.clone(emptyState)
         self.lastToken = [187]

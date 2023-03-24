@@ -78,7 +78,7 @@ class module:
         self.arrayPush = arrayPush
         def rng(x: int): return range(x)
         self.rng = rng
-        def pop(x): return x[-1]
+        def pop(x): return x[-1:]
         self.pop = pop
         def arrayGet(x, i: int): return x[i]
         self.arrayGet = arrayGet
