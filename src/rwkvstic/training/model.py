@@ -31,13 +31,13 @@ class RWKV(torch.nn.Module):
         self.register_module("head", self.head)
 
         # set all weights to 0
-        self.emb.weight.data = torch.zeros_like(self.emb.weight.data)
-        self.ln_out.weight.data = torch.zeros_like(self.ln_out.weight.data)
-        self.ln_out.bias.data = torch.zeros_like(self.ln_out.bias.data)
-        self.ln_in.weight.data = torch.zeros_like(self.ln_in.weight.data)
-        self.ln_in.bias.data = torch.zeros_like(self.ln_in.bias.data)
-        self.head.weight.data = torch.zeros_like(self.head.weight.data)
-        self.head.bias.data = torch.zeros_like(self.head.bias.data)
+        self.emb.weight.data = torch.rand_like(self.emb.weight.data)
+        self.ln_out.weight.data = torch.rand_like(self.ln_out.weight.data)
+        self.ln_out.bias.data = torch.rand_like(self.ln_out.bias.data)
+        self.ln_in.weight.data = torch.rand_like(self.ln_in.weight.data)
+        self.ln_in.bias.data = torch.rand_like(self.ln_in.bias.data)
+        self.head.weight.data = torch.rand_like(self.head.weight.data)
+        self.head.bias.data = torch.rand_like(self.head.bias.data)
 
         
         # loading bar
@@ -71,8 +71,8 @@ print (data[:100])
 print(max(data))
 
 
-dims = 128
-layers = 5
+dims = 32
+layers = 10
 ctx = 100
 head = max(data)+1
 
@@ -82,6 +82,7 @@ myrwkv = RWKV(dims,layers, head, ctx)
 
 #
 myrwkv.to("cuda")
+myrwkv.to(torch.float64)
 myrwkv.train()
 for x in myrwkv.parameters():
     x.requires_grad = True
@@ -106,7 +107,9 @@ for epoch in range(len(data)//ctx):
             logits = myrwkv.forward(torch.LongTensor(test).to(torch.int64).to("cuda"))
             test.append(torch.argmax(logits[-1]).item())
             test = test[1:]
-        print("".join([chr(i) for i in test]))
+        print("".join([chr(i) for i in test[0:50]]))
+        print("[predicted]")
+        print("".join([chr(i) for i in test[50:100]]))
 
 
 
