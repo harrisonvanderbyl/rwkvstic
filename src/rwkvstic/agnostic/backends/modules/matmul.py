@@ -156,7 +156,7 @@ class Linear(RwkvModule):
             outlist = [weight(splits[i]) for i,weight in enumerate(self.weights)]
             out = torch.zeros_like(outlist[0])
             for i, outo in enumerate(outlist):
-                out += outo.to(dtype=torch.float64, device=self.device, non_blocking=True)
+                out += outo.to(dtype=self.runtimedtype, device=self.device, non_blocking=True)
             return out
         
         
