@@ -12,7 +12,7 @@ current_path = os.path.dirname(os.path.abspath(__file__))
 method = torch.jit.script_method
 module = torch.jit.ScriptModule
 script = torch.jit.script
-def OptRWKV(path, jit=True  , export=False, **kwargs):
+def OptRWKV(path, jit=False  , export=False, **kwargs):
     
 
     device = kwargs.get("device", "cuda")

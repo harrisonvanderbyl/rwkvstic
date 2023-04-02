@@ -57,7 +57,8 @@ class Block(RwkvModule):
                 x = x.to(device=self.time_decay.device)
                 xy = self.ln1(x)
 
-                tc = xy.roll(1, 0)
+                # tc = xy.roll(1, 0) not supported mps
+                tc = tc[torch.arange(tc.shape[0])-1]
                 rmc = tc[0].clone()
                 tc[0] = state[0]
                 state[0] = rmc
@@ -79,7 +80,8 @@ class Block(RwkvModule):
 
                 ddd = self.ln2(rz)
 
-                rc = ddd.roll(1, 0)
+                # rc = ddd.roll(1, 0)
+                rc = rc[torch.arange(rc.shape[0])-1]
                 dc = rc[0].clone()
                 rc[0] = state[1]
                 state[1] = dc
