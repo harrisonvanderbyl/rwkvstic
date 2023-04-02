@@ -22,6 +22,6 @@ class LayerNorm(RwkvModule):
     def config(self, **config):
         self.device = config["devices"][0]["device"]
         self.runtimedtype = torch.float32 if self.device == "mps" else torch.float64
-        self.weight = self.weight.to(self.device)
-        self.bias = self.bias.to(self.device)
+        self.weight = self.weight.to(self.device, dtype=self.runtimedtype)
+        self.bias = self.bias.to(self.device, dtype=self.runtimedtype)
 
