@@ -4,7 +4,7 @@ from rwkvstic.agnostic.backends.modules.layernorm import LayerNorm
 from rwkvstic.agnostic.backends.modules.block import Block
 from rwkvstic.agnostic.backends.modules.emb import RwkvEmb, RwkvModule
 from tqdm import tqdm
-from torch.utils.cpp_extension import load
+
 import os
 
 current_path = os.path.dirname(os.path.abspath(__file__))
@@ -16,18 +16,20 @@ def OptRWKV(path, jit=True  , export=False, **kwargs):
     
 
     device = kwargs.get("device", "cuda")
-
-    load(
-        name=f"wkv_cuda",
-        sources=[f"{current_path}/cuda/wrapper.cpp",
-                f"{current_path}/cuda/operators.cu",
-                f"{current_path}/cuda/operators32.cu"
-                ],
-        verbose=False,
-        extra_cuda_cflags=["-std=c++17", "-O3" ],
+    config = kwargs.get("config", {"devices":[{"device": "cuda:0", "dtype":torch.uint8}], "custom":True})
+    if config["devices"][0]["device"] != "mps":
+        from torch.utils.cpp_extension import load
+        load(
+            name=f"wkv_cuda",
+            sources=[f"{current_path}/cuda/wrapper.cpp",
+                    f"{current_path}/cuda/operators.cu",
+                    f"{current_path}/cuda/operators32.cu"
+                    ],
+            verbose=False,
+            extra_cuda_cflags=["-std=c++17", "-O3" ],
+            
+            is_python_module=False)
         
-        is_python_module=False)
-    
 
     class myRWKV(RwkvModule):
 
@@ -107,8 +109,7 @@ def OptRWKV(path, jit=True  , export=False, **kwargs):
     torch.cuda.empty_cache()
     myrwkv.eval()
     
-    config = kwargs.get("config", {"devices":[{"device": "cuda:0", "dtype":torch.uint8}], "custom":True})
-
+    
     myrwkv.configs(**config)
 
     # memory allocated after loading
