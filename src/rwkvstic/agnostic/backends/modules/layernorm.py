@@ -7,12 +7,10 @@ class LayerNorm(RwkvModule):
         self.weight = weight.clone().to(torch.float64)
         self.bias = bias.clone().to(torch.float64)
         self.device = torch.device("cpu")
+        self.runtimedtype = torch.float64
     def forward(self, x):
 
-        if x.device != self.device:
-            self.device = x.device
-            self.weight = self.weight.to(self.device)
-            self.bias = self.bias.to(self.device)
+        x = x.to(self.device, dtype=self.runtimedtype)
 
         xee2 = x - torch.mean(x, dim=1, keepdim=True)
 
@@ -21,5 +19,9 @@ class LayerNorm(RwkvModule):
         
         return self.weight*(xee2/x2) + self.bias
 
-     
+    def config(self, **config):
+        self.device = config["devices"][0]["device"]
+        self.runtimedtype = torch.float32 if self.device == "mps" else torch.float64
+        self.weight = self.weight.to(self.device)
+        self.bias = self.bias.to(self.device)
 

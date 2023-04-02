@@ -1,7 +1,7 @@
 #include <torch/extension.h>
 #include "ATen/ATen.h"
 #include <iostream>
-
+#include <c10/cuda/CUDAGuard.h>
 // generic T either float or fp16 or fp64
 
 
@@ -45,6 +45,7 @@ void cuda_mm8_one(int N, int M,
 void cuda_wkv_forward(int B, int T, int C, float *w, float *u, float *k, float *v, float *y, float *aa, float *bb, float *pp);
 void wkv_forward(int64_t B, int64_t T, int64_t C, torch::Tensor &w, torch::Tensor &u, torch::Tensor &k, torch::Tensor &v, torch::Tensor &y, torch::Tensor &aa, torch::Tensor &bb, torch::Tensor &pp) {
     assert(w.scalar_type() == torch::kDouble);
+    const at::cuda::OptionalCUDAGuard device_guard(device_of(w));
     cuda_wkv_forward(B, T, C, w.data_ptr<double>(), u.data_ptr<double>(), k.data_ptr<double>(), v.data_ptr<double>(), y.data_ptr<double>(), aa.data_ptr<double>(), bb.data_ptr<double>(), pp.data_ptr<double>());
     
 }
@@ -56,7 +57,7 @@ void mm8_one(int64_t N, int64_t M,
     assert(w.stride(1) == 1);
     assert(y.stride(0) == 1);
     assert(x.scalar_type() == y.scalar_type() && x.scalar_type() == r.scalar_type());
-
+    const at::cuda::OptionalCUDAGuard device_guard(device_of(x));
     if( x.scalar_type()== torch::kDouble){
         cuda_mm8_one(
         N, M,
@@ -94,6 +95,7 @@ void mm8_three(int64_t N, int64_t M,
     assert(y1.stride(0) == 1);
     assert(y2.stride(0) == 1);
     assert(x.scalar_type() == y.scalar_type() && x.scalar_type() == r.scalar_type());
+    const at::cuda::OptionalCUDAGuard device_guard(device_of(x));
     if(x.scalar_type() == torch::kDouble){
         cuda_mm8_three(
         N, M,

@@ -12,7 +12,7 @@ current_path = os.path.dirname(os.path.abspath(__file__))
 method = torch.jit.script_method
 module = torch.jit.ScriptModule
 script = torch.jit.script
-def OptRWKV(path, jit=False, export=False, **kwargs):
+def OptRWKV(path, jit=True  , export=False, **kwargs):
     
 
     device = kwargs.get("device", "cuda")
@@ -49,13 +49,18 @@ def OptRWKV(path, jit=False, export=False, **kwargs):
                 w["blocks.0.ln0.bias"]
             )
 
+
             self.head = Linear(
                 w["head.weight"]
             )
+
+            
             
             print("Memory allocated before layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
 
             self.blocks = torch.nn.ModuleList([Block(w, i) for i in tqdm(range(layers), desc="loading layers")])
+
+            del w
 
         
         def forward(self, x, state):
@@ -77,9 +82,11 @@ def OptRWKV(path, jit=False, export=False, **kwargs):
         
         def configs(self, **config):
             self.head.config(**config)
-            self.emptyState = self.emptyState.to(config["devices"][0]["device"]).to(torch.float64)
-            for i, block in enumerate(self.blocks):
-                block.config(**config)
+            self.emptyState = self.emptyState.to(config["devices"][0]["device"]).to(torch.float32 if config["devices"][0]["device"] == "mps" else torch.float64)
+            self.ln_in.config(**config)
+            self.ln_out.config(**config)
+            for i, block in tqdm(enumerate(self.blocks),"configuring layers"):
+                block.config(i,**config)
 
             
         
@@ -89,15 +96,20 @@ def OptRWKV(path, jit=False, export=False, **kwargs):
         returnObject: myRWKV = myrwkv
         return returnObject
     w = torch.load(path, map_location="cpu")
+    # detach weights
+
     dims = len(w["blocks.0.att.key.weight"])
     layers = len(
         list(filter(lambda x: "blocks" in x and "ln1.bias" in x, w.keys())))
 
     myrwkv = myRWKV(w,dims,layers)
     del w
+    torch.cuda.empty_cache()
     myrwkv.eval()
     
-    myrwkv.configs(devices=[{"device": device, "dtype":torch.uint8}], custom=True)
+    config = kwargs.get("config", {"devices":[{"device": "cuda:0", "dtype":torch.uint8}], "custom":True})
+
+    myrwkv.configs(**config)
 
     # memory allocated after loading
     print("Memory allocated after layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")

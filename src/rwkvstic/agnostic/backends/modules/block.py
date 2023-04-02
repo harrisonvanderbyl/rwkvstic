@@ -45,6 +45,8 @@ class Block(RwkvModule):
 
                 self.ffnmix= torch.stack((w[f"blocks.{i}.ffn.time_mix_k"].squeeze(),
                     w[f"blocks.{i}.ffn.time_mix_r"].squeeze())).unsqueeze(1).to(torch.float64).clone()
+                
+
                 torch.cuda.empty_cache()
             
             
@@ -61,7 +63,7 @@ class Block(RwkvModule):
                 state[0] = rmc
 
                 mix = torch.lerp(tc.unsqueeze(0), xy.unsqueeze(0), self.attmix)
-
+              
                 k,v,r = self.att(mix)
 
 
@@ -94,7 +96,8 @@ class Block(RwkvModule):
                 out = rvm * rf + rz
 
                 return out, state
-            def config(self, **config):
+            
+            def config(self,i, **config):
                 self.att.config(**config)
                 self.ffnkey.config(**config)
                 self.ffnvalue.config(**config)
@@ -103,10 +106,13 @@ class Block(RwkvModule):
                 self.wkv.config(**config)
 
                 currentDevice = config["devices"][0]["device"]
-                self.attmix = self.attmix.to(currentDevice)
-                self.time_first = self.time_first.to(currentDevice)
-                self.time_decay = self.time_decay.to(currentDevice)
-                self.ffnmix = self.ffnmix.to(currentDevice)
+                runtimedtype = torch.float32 if currentDevice == "mps" else torch.float64
+                self.attmix = self.attmix.to(device=currentDevice, dtype=runtimedtype)
+                self.time_first = self.time_first.to(device=currentDevice, dtype=runtimedtype)
+                self.time_decay = self.time_decay.to(device=currentDevice, dtype=runtimedtype)
+                self.ffnmix = self.ffnmix.to(currentDevice, dtype=runtimedtype)
+                self.ln1.config(**config)
+                self.ln2.config(**config)
                 torch.cuda.empty_cache()
 
                 

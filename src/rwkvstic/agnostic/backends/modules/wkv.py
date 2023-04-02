@@ -6,6 +6,7 @@ class WKV(RwkvModule):
         super(WKV, self).__init__()
         self.device = torch.device("cpu")
         self.custom = False
+        self.runtimedtype = torch.float64
     def cudawkv(self, T: int, C: int, w, u, k, v, aa, bb, pp):
         assert 1 * C % min(C, 32) == 0
         k = k.to(torch.float64)
@@ -19,7 +20,7 @@ class WKV(RwkvModule):
     
     
     def wkv(self, T: int, C: int, w, u, k, v, aa, bb, pp):
-        y = torch.empty((T, C), device=self.device, memory_format=torch.contiguous_format, dtype=torch.float64)
+        y = torch.empty((T, C), device=self.device, memory_format=torch.contiguous_format, dtype=self.runtimedtype)
         for i in torch.arange(T):
             kk = torch.exp(k[i])
             vv = v[i]
@@ -39,6 +40,7 @@ class WKV(RwkvModule):
 
     def config(self, **config):
         self.device = config["devices"][0]["device"]
+        self.runtimedtype = torch.float32 if self.device == "mps" else torch.float64
         self.custom = config.get("custom", False)
 
 
