@@ -64,7 +64,7 @@ class Block(RwkvModule):
                 state[0] = rmc
 
                 # mix = torch.lerp(tc.unsqueeze(0), xy.unsqueeze(0), self.attmix) not supported mps
-                mix = (tc.unsqueeze(0) * self.attmix + xy.unsqueeze(0) * (1-self.attmix))
+                mix = (xy.unsqueeze(0) * self.attmix + tc.unsqueeze(0) * (1-self.attmix))
               
                 k,v,r = self.att(mix)
 
@@ -88,7 +88,7 @@ class Block(RwkvModule):
                 state[1] = dc
 
                 # fmix = torch.lerp(rc, ddd, self.ffnmix)
-                fmix = (rc * self.ffnmix + ddd * (1-self.ffnmix))
+                fmix = (ddd * self.ffnmix + rc * (1-self.ffnmix))
 
                 
 
