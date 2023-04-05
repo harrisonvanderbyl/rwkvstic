@@ -15,6 +15,7 @@ class WKV(RwkvModule):
         k = k.contiguous().to(torch.float64)
         v = v.contiguous().to(torch.float64)
         y = torch.empty((T, C), device=self.device, memory_format=torch.contiguous_format, dtype=torch.float64)
+        
         torch.ops.rwkv.wkv_forward(1, T, C, w, u, k, v, y, aa, bb, pp)
         return y.to(torch.float64), aa, bb, pp
     

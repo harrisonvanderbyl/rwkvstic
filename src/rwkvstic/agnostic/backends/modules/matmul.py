@@ -133,7 +133,7 @@ class mm8_3Naive(MM8_3):
             self.device = device
             super().__init__(w,w1,w2, device, stream)
         
-        def forward(self,x):
+        def forward(self,x:List[torch.Tensor]):
             return ((x[0]*self.range).to(device=self.device, dtype=self.dtype) @ self.weight.to(device=self.device,dtype=self.dtype)) + (x[0].mv(self.offset)).reshape(-1, 1), \
                     (x[1]*self.range1).to(device=self.device, dtype=self.dtype) @ self.weight1.to(device=self.device,dtype=self.dtype) + (x[1].mv(self.offset1)).reshape(-1, 1), \
                     (x[2]*self.range2).to(device=self.device, dtype=self.dtype) @ self.weight2.to(device=self.device,dtype=self.dtype) + (x[2].mv(self.offset2)).reshape(-1, 1)
@@ -206,6 +206,7 @@ class Linear3(RwkvModule):
             self.device = self.w.device
             self.runtimedtype = torch.float64
             self.weights = torch.nn.ModuleList()
+            
         
         
         def newfunc(self,x:torch.Tensor):

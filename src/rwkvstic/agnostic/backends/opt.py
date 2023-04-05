@@ -12,12 +12,12 @@ current_path = os.path.dirname(os.path.abspath(__file__))
 method = torch.jit.script_method
 module = torch.jit.ScriptModule
 script = torch.jit.script
-def OptRWKV(path, jit=False  , export=False, **kwargs):
+def OptRWKV(path, jit=True  , export=False, **kwargs):
     
 
     device = kwargs.get("device", "cuda")
-    config = kwargs.get("config", {"devices":[{"device": "cuda:0", "dtype":torch.uint8}], "custom":True})
-    if config["devices"][0]["device"] != "mps":
+    config = kwargs.get("config", {"devices":[{"device": "cpu", "dtype":torch.float32}]})
+    if config["devices"][0]["device"] != "mps" and config["devices"][0]["device"] != "cpu":
         from torch.utils.cpp_extension import load
         load(
             name=f"wkv_cuda",
@@ -29,7 +29,18 @@ def OptRWKV(path, jit=False  , export=False, **kwargs):
             extra_cuda_cflags=["-std=c++17", "-O3" ],
             
             is_python_module=False)
+    else:
+        print("Using CPU or MPS")
+        # create dummy module for jit
+        # add dummy to torch library
         
+        def dummyfunc(i:int, T:int, C:int, w:torch.Tensor, u:torch.Tensor, k:torch.Tensor, v:torch.Tensor, y:torch.Tensor, aa:torch.Tensor, bb:torch.Tensor, pp:torch.Tensor):
+                return torch.tensor(0)
+            
+ 
+
+        torch.ops.rwkv.wkv_forward = dummyfunc
+
 
     class myRWKV(RwkvModule):
 
