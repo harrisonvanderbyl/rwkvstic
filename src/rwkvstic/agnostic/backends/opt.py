@@ -125,6 +125,25 @@ with torch.no_grad():
             returnObject: myRWKV = myrwkv
             return returnObject
         w = torch.load(path, map_location="cpu")
+
+        # if kwargs.get("lora_file", None) is not None:
+        #     keys = set(w.keys())
+        #     loraweight = torch.load(kwargs["lora_file"], map_location="cpu")
+        #     lkeys = set(loraweight.keys())
+        #     for k in keys:
+        #         k: str
+        #         if k.endswith('.weight'):
+        #             prefix = k[:-len('.weight')]
+        #             lora_A = prefix + '.lora_A.weight'
+        #             lora_B = prefix + '.lora_B.weight'
+        #             if lora_A in lkeys:
+        #                 assert lora_B in lkeys
+        #                 print(f'merging {lora_A} and {lora_B} into {k}')
+                        
+        #                 w[k] += loraweight[lora_B] @ loraweight[lora_A] * \
+        #                     (kwargs.get("lora_alpha",1) / loraweight[lora_A].shape[0])
+                   
+
         dims = len(w["blocks.0.att.key.weight"])
         layers = len(
             list(filter(lambda x: "blocks" in x and "ln1.bias" in x, w.keys())))
