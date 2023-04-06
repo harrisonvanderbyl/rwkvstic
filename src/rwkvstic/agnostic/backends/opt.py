@@ -18,17 +18,8 @@ def OptRWKV(path, jit=True  , export=False, **kwargs):
     device = kwargs.get("device", "cuda")
     config = kwargs.get("config", {"devices":[{"device": "cpu", "dtype":torch.float32}]})
     if config["devices"][0]["device"] != "mps" and config["devices"][0]["device"] != "cpu":
-        from torch.utils.cpp_extension import load
-        load(
-            name=f"wkv_cuda",
-            sources=[f"{current_path}/cuda/wrapper.cpp",
-                    f"{current_path}/cuda/operators.cu",
-                    f"{current_path}/cuda/operators32.cu"
-                    ],
-            verbose=False,
-            extra_cuda_cflags=["-std=c++17", "-O3" ],
-            
-            is_python_module=False)
+        from rwkvstic.agnostic.backends.cuda.load import loadCustomCudaModule
+        loadCustomCudaModule()
     else:
         print("Using CPU or MPS")
         # create dummy module for jit
