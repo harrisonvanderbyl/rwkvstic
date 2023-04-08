@@ -1,26 +1,32 @@
 
 from rwkvstic.agnostic.backends.modules.base import RwkvModule
 import torch
-class WKV(RwkvModule):
+class CudaWKV(RwkvModule):
     def __init__(self):
-        super(WKV, self).__init__()
-        self.device = torch.device("cpu")
-        self.custom = False
-        self.runtimedtype = torch.float64
-    def cudawkv(self, T: int, C: int, w, u, k, v, aa, bb, pp):
+        super(CudaWKV, self).__init__()
+        self.y = torch.empty((1, 1), device="cpu", memory_format=torch.contiguous_format, dtype=torch.float64)
+    def forward(self, T: int, C: int, w, u, k, v, aa, bb, pp):
         assert 1 * C % min(C, 32) == 0
         k = k.to(torch.float64)
         w = w.contiguous().to(torch.float64)
         u = u.contiguous().to(torch.float64)
         k = k.contiguous().to(torch.float64)
         v = v.contiguous().to(torch.float64)
-        y = torch.empty((T, C), device=self.device, memory_format=torch.contiguous_format, dtype=torch.float64)
+        if self.y .shape[0] != T or self.y .shape[1] != C or self.y .device != w.device:
+            self.y = torch.empty((T, C), device=w.device, memory_format=torch.contiguous_format, dtype=torch.float64)
         
-        torch.ops.rwkv.wkv_forward(1, T, C, w, u, k, v, y, aa, bb, pp)
-        return y.to(torch.float64), aa, bb, pp
+        torch.ops.rwkv.wkv_forward(1, T, C, w, u, k, v, self.y, aa, bb, pp)
+        return self.y.to(torch.float64), aa, bb, pp
     
     
-    def wkv(self, T: int, C: int, w, u, k, v, aa, bb, pp):
+
+class TorchWKV(RwkvModule):
+    def __init__(self, device, dtype):
+        super(TorchWKV, self).__init__()
+        self.device = device
+        self.runtimedtype = dtype
+   
+    def forward(self, T: int, C: int, w, u, k, v, aa, bb, pp):
         y = torch.empty((T, C), device=self.device, memory_format=torch.contiguous_format, dtype=self.runtimedtype)
         for i in torch.arange(T):
             kk = torch.exp(k[i])
@@ -32,16 +38,27 @@ class WKV(RwkvModule):
             bb = (bb + kk) * torch.exp(w)
         return y, aa, bb, pp
 
-    def forward(self, T: int, C: int, w, u, k, v, aa, bb, pp):
-        if self.custom == False:
-            return self.wkv(T, C, w, u, k, v, aa, bb, pp)
-        else:
-            return self.cudawkv(T, C, w, u, k, v, aa, bb, pp)
+   
+
         
 
-    def config(self, **config):
-        self.device = config["devices"][0]["device"]
-        self.runtimedtype = torch.float32 if self.device == "mps" else torch.float64
-        self.custom = config.get("custom", False)
+class WKV(RwkvModule):
+    def __init__(self):
+        super(WKV, self).__init__()
+        self.wkvmodule = CudaWKV()
+   
 
+    def forward(self, T: int, C: int, w, u, k, v, aa, bb, pp):
+        return self.wkvmodule(T, C, w, u, k, v, aa, bb, pp)
+
+    def config(self, **config):
+        device = config["devices"][0]["device"]
+        runtimedtype = torch.float32 if device == "mps" else torch.float64
+        custom = config.get("custom", runtimedtype != torch.float32)
+
+        if custom:
+            self.wkvmodule = CudaWKV()
+
+        else:
+            self.wkvmodule = TorchWKV(device, runtimedtype)
 

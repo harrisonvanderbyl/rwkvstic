@@ -10,7 +10,4 @@ def loadCustomCudaModule():
                 f"{current_path}/operators.cu",
                 f"{current_path}/operators32.cu"
                 ],
-        verbose=False,
-        extra_cuda_cflags=["-std=c++17", "-O3" ],
-        
-        is_python_module=False)
+        )

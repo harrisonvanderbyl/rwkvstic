@@ -16,22 +16,11 @@ def OptRWKV(path, jit=True  , export=False, **kwargs):
     
 
     device = kwargs.get("device", "cuda")
-    config = kwargs.get("config", {"devices":[{"device": "cpu", "dtype":torch.float32}]})
+    config = kwargs.get("config", {"devices":[{"device": "cuda", "dtype":torch.uint8}]})
+
     if config["devices"][0]["device"] != "mps" and config["devices"][0]["device"] != "cpu":
         from rwkvstic.agnostic.backends.cuda.load import loadCustomCudaModule
         loadCustomCudaModule()
-    else:
-        print("Using CPU or MPS")
-        # create dummy module for jit
-        # add dummy to torch library
-        
-        def dummyfunc(i:int, T:int, C:int, w:torch.Tensor, u:torch.Tensor, k:torch.Tensor, v:torch.Tensor, y:torch.Tensor, aa:torch.Tensor, bb:torch.Tensor, pp:torch.Tensor):
-                return torch.tensor(0)
-            
- 
-
-        torch.ops.rwkv.wkv_forward = dummyfunc
-
 
     class myRWKV(RwkvModule):
 
@@ -63,6 +52,8 @@ def OptRWKV(path, jit=True  , export=False, **kwargs):
             print("Memory allocated before layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
 
             self.blocks = torch.nn.ModuleList([Block(w, i) for i in tqdm(range(layers), desc="loading layers")])
+
+
 
             del w
 
@@ -116,8 +107,8 @@ def OptRWKV(path, jit=True  , export=False, **kwargs):
 
     # memory allocated after loading
     print("Memory allocated after layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
-    
-    
+
+
     if jit:
         myrwkv = torch.jit.script(myrwkv)
     if export:

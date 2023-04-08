@@ -16,21 +16,26 @@ class MM8(RwkvModule):
                 self.N = self.weight.shape[1]
 
             def chunkQuantizeMatrix(self, x):
-                toset = torch.empty(x.shape[::-1], device=self.device if not self.stream else "cpu", dtype=torch.uint8)
-                xx = self.QuantizeMatrix(x.t(), 0, toset)
-                mrange = xx[0]
-                offset = xx[1]
+                
+                xx = self.QuantizeMatrix(x.t(), 0)
+                toset = xx[0].to(dtype=torch.uint8,device=self.device if not self.stream else "cpu", non_blocking=True, memory_format=torch.contiguous_format)
+                mrange = xx[1]
+                offset = xx[2]
                 return toset, mrange, offset
             
-            def QuantizeMatrix(self, xx, i, toset):
+            def QuantizeMatrix(self, xx, i):
                 width = xx.shape[0]
                 start = i * width
                 end = start + width
                 x = xx[start:end].t()
                 rang = 255
-                ran, mini = (x.max(0)[0]-x.min(0)[0])/rang,  x.min(0)[0]
-                toset[start:end] = ((x-mini)/ran).round().t().to(torch.uint8).to(toset.device, non_blocking=True)
-                return [ran.to(torch.float32).to(self.device).clone(), mini.to(self.runtimedtype).to(self.device).clone()]
+                ran, mini = ((x.max(0)[0]).double()-(x.min(0)[0]).double())/rang,  x.min(0)[0].double()
+                out = ((x-mini)/ran)
+                fractmat = out.frac().double()
+                fractmat = fractmat.mean(0)
+                mini = mini.double() + fractmat*ran.double()
+                
+                return [out.floor().t(),ran.to(torch.float32).to(self.device).clone(), mini.to(self.runtimedtype).to(self.device).clone()]
 
             def cuda_mm8(self, N:int, M:int, x, w, r):
                 x = x[0]
