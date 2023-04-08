@@ -23,29 +23,13 @@ __global__ void kernel_wkv_forward(const int B, const int T, const int C,
     double pp = _pp[_state_offset];
     for (int i = 0; i < T; i++) {
         const int ii = i * C;
-
-        const double kk = exp(k[ii]);
+        
         const double vv = v[ii];
         const double wr1 = aa +  exp(u+w+k[ii]) * vv;
         const double wr2 = bb +  exp(u+w+k[ii]);
         y[ii] = wr1 / wr2;
-        aa = (aa + kk*vv) * exp(w);
-        bb = (bb + kk) * exp(w);
-        // const double kk = double(k[ii]);
-        // const double vv = double(v[ii]);
-        // double ww = u + kk;
-        // double p = max(pp, ww);
-        // double e1 = exp(pp - p);
-        // double e2 = exp(ww - p);
-        // y[ii] = ((e1 * aa + e2 * vv) / (e1 * bb + e2));
-        // ww = w + pp;
-        // p = max(ww, kk);
-        // e1 = exp(ww - p);
-        // e2 = exp(kk - p);
-        // aa = e1 * aa + e2 * vv;
-        // bb = e1 * bb + e2;
-        // pp = p;
-
+        aa = (aa * exp(w) + exp( w + k[ii])*vv) ;
+        bb = (bb * exp(w) + exp( w + k[ii])) ;
     }
     _aa[_state_offset] = aa;
     _bb[_state_offset] = bb;

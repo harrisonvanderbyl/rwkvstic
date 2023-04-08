@@ -1,163 +1,119 @@
 import torch
-from rwkvstic.agnostic.backends.modules.matmul import MM8
+from rwkvstic.agnostic.backends.modules.matmul import Linear
 from rwkvstic.agnostic.backends.modules.layernorm import LayerNorm
 from rwkvstic.agnostic.backends.modules.block import Block
 from rwkvstic.agnostic.backends.modules.emb import RwkvEmb, RwkvModule
-# set torch to use all 12 cores on amd
-torch.set_num_threads(24)
-# set torch to use hardware specific optimizations
-torch.backends.cudnn.benchmark = True
-# set torch to use deterministic algorithms
-torch.backends.cudnn.deterministic = True
-# set torch to use deterministic algorithms
-torch.backends.cudnn.enabled = True
-from torch.utils.cpp_extension import load
-import gc
+from tqdm import tqdm
+
 import os
+
 current_path = os.path.dirname(os.path.abspath(__file__))
 
 method = torch.jit.script_method
 module = torch.jit.ScriptModule
 script = torch.jit.script
-with torch.no_grad():
-    def OptRWKV(path, jit=True, export=False, maxvram=100,dtype = torch.float32, runtimedtype = torch.float64, **kwargs):
-      
+def OptRWKV(path, jit=True  , export=False, **kwargs):
+    
 
-        device = kwargs.get("device", "cuda")
+    device = kwargs.get("device", "cuda")
+    config = kwargs.get("config", {"devices":[{"device": "cuda", "dtype":torch.uint8}]})
 
-        
-        
-        
+    if config["devices"][0]["device"] != "mps" and config["devices"][0]["device"] != "cpu":
+        from rwkvstic.agnostic.backends.cuda.load import loadCustomCudaModule
+        loadCustomCudaModule()
 
-        load(
-            name=f"wkv_cuda",
-            sources=[f"{current_path}/cuda/wrapper.cpp",
-                    f"{current_path}/cuda/operators.cu",
-                    f"{current_path}/cuda/operators32.cu"
-                    ],
-            verbose=False,
-            extra_cuda_cflags=["-std=c++17", "-O3" ],
+    class myRWKV(RwkvModule):
+
+        def __init__(self,w,dims,layers):
+            super(myRWKV, self).__init__()
+            print("Legacy RWKV")
             
-            is_python_module=False)
-        
+            self.emptyState = torch.tensor(
+                layers * [[[0]*dims]*4+[[-1e30]*dims]])
 
-        class myRWKV(RwkvModule):
+            self.emb =  RwkvEmb(w["emb.weight"])
+            self.ln_out = LayerNorm(
+                w["ln_out.weight"],
+                w["ln_out.bias"]
+            )
 
-            def __init__(self,w,dims,layers, device="cuda", maxvram = 100, dtype = torch.float64, runtimedtype = torch.float64):
-                super(myRWKV, self).__init__()
-                print("Legacy RWKV")
-                
-                self.device = device
-                self.dtype = dtype
-                self.runtimedtype = runtimedtype
-                # self.vocab_pad = (-w["head.weight"].shape[0])%64
-                # print(self.vocab_pad)
-                
-                # import torch.nn.functional as F
-                # pdweight = F.pad(input=w["head.weight"].t(), pad=(0,self.vocab_pad), mode='constant', value=0).t()
-
-                # print(pdweight.shape)
-                
-
-               
-                # head = 50277
-                
-                self.emptyState = torch.tensor(
-                    layers * [[[0]*dims]*4+[[-1e30]*dims]], device=device, dtype=runtimedtype)
-
-                
-
-                
-               
-                self.emb =  RwkvEmb(w["emb.weight"], device, runtimedtype)
-                self.ln_out = LayerNorm(
-                    w["ln_out.weight"],
-                    w["ln_out.bias"],
-                    device=device, dtype=runtimedtype
-                )
-                self.ln_in = LayerNorm(
-                    w["blocks.0.ln0.weight"],
-                    w["blocks.0.ln0.bias"],
-                    device=device, dtype=runtimedtype
-                )
-
-                self.head = MM8(
-                    w["head.weight"],
-                    device,
-                    maxvram,
-                    dtype=dtype
-                    ,
-                    runtimedtype=runtimedtype
-
-                )
-                
-                print("Memory allocated before layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
-                # loading bar
-                from tqdm import tqdm
-                self.blocks = torch.nn.ModuleList([Block(dims,w, i, device,maxvram, dtype,runtimedtype) for i in tqdm(range(layers), desc="loading layers")])
+            self.ln_in = LayerNorm(
+                w["blocks.0.ln0.weight"],
+                w["blocks.0.ln0.bias"]
+            )
 
 
-                self.device = device
+            self.head = Linear(
+                w["head.weight"]
+            )
 
             
             
-            @ method
-            def forward(self, x, state):
-                
-                x = self.emb(x)
-                x = self.ln_in(x)
+            print("Memory allocated before layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
 
-                for i, block in enumerate(self.blocks):
+            self.blocks = torch.nn.ModuleList([Block(w, i) for i in tqdm(range(layers), desc="loading layers")])
 
-                    x, rstate = block(x, state[i])
-                    state[i] = rstate
 
-                x = self.ln_out(x)
 
-                outx = self.head(x[-1:]).detach().squeeze()
-                
+            del w
 
-                return outx, state
+        
+        def forward(self, x, state):
             
+            x = self.emb(x)
+            x = self.ln_in(x)
+
+            for i, block in enumerate(self.blocks):
+
+                x, rstate = block(x, state[i])
+                state[i] = rstate
+
+            x = self.ln_out(x)
+
+            outx = self.head(x[-1:]).detach().squeeze()
             
-        if path.endswith(".rwkv"):
-            myrwkv = torch.jit.load(path)
-            returnObject: myRWKV = myrwkv
-            return returnObject
-        w = torch.load(path, map_location="cpu")
 
-        # if kwargs.get("lora_file", None) is not None:
-        #     keys = set(w.keys())
-        #     loraweight = torch.load(kwargs["lora_file"], map_location="cpu")
-        #     lkeys = set(loraweight.keys())
-        #     for k in keys:
-        #         k: str
-        #         if k.endswith('.weight'):
-        #             prefix = k[:-len('.weight')]
-        #             lora_A = prefix + '.lora_A.weight'
-        #             lora_B = prefix + '.lora_B.weight'
-        #             if lora_A in lkeys:
-        #                 assert lora_B in lkeys
-        #                 print(f'merging {lora_A} and {lora_B} into {k}')
-                        
-        #                 w[k] += loraweight[lora_B] @ loraweight[lora_A] * \
-        #                     (kwargs.get("lora_alpha",1) / loraweight[lora_A].shape[0])
-                   
+            return outx, state
+        
+        def configs(self, **config):
+            self.head.config(**config)
+            self.emptyState = self.emptyState.to(config["devices"][0]["device"]).to(torch.float32 if config["devices"][0]["device"] == "mps" else torch.float64)
+            self.ln_in.config(**config)
+            self.ln_out.config(**config)
+            for i, block in tqdm(enumerate(self.blocks),"configuring layers"):
+                block.config(i,**config)
 
-        dims = len(w["blocks.0.att.key.weight"])
-        layers = len(
-            list(filter(lambda x: "blocks" in x and "ln1.bias" in x, w.keys())))
-
-        myrwkv = myRWKV(w,dims,layers, dtype=dtype, runtimedtype=runtimedtype, maxvram=maxvram, device=device)
-        del w
-        myrwkv.eval()
+            
         
         
-        if jit:
-            myrwkv = torch.jit.script(myrwkv)
-        if export:
-            torch.jit.save(myrwkv, export+".rwkv")
-            
-            exit()
+    if path.endswith(".rwkv"):
+        myrwkv = torch.jit.load(path)
         returnObject: myRWKV = myrwkv
         return returnObject
+    w = torch.load(path, map_location="cpu")
+    # detach weights
+
+    dims = len(w["blocks.0.att.key.weight"])
+    layers = len(
+        list(filter(lambda x: "blocks" in x and "ln1.bias" in x, w.keys())))
+
+    myrwkv = myRWKV(w,dims,layers)
+    del w
+    torch.cuda.empty_cache()
+    myrwkv.eval()
+    
+    
+    myrwkv.configs(**config)
+
+    # memory allocated after loading
+    print("Memory allocated after layers: ", torch.cuda.memory_allocated(device=device)/1024/1024, "MB")
+
+
+    if jit:
+        myrwkv = torch.jit.script(myrwkv)
+    if export:
+        torch.jit.save(myrwkv, export+".rwkv")
+        
+        exit()
+    returnObject: myRWKV = myrwkv
+    return returnObject

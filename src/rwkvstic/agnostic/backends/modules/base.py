@@ -1,5 +1,7 @@
 import torch
-class RwkvModule(torch.jit.ScriptModule):
+
+
+class RwkvModule(torch.nn.Module):
     def __init__(self):
         super(RwkvModule, self).__init__()
         self.submodules = []
@@ -9,5 +11,5 @@ class RwkvModule(torch.jit.ScriptModule):
     def add_submodule(self, submodule):
         self.submodules.append(submodule)
 
-    def to_gpu(self, device, maxVram):
+    def config(self, config):
         pass
