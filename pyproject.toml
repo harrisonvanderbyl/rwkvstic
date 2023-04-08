@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
 name = "rwkvstic"
-version = "2.1.2"
+version = "3.0.0"
 authors = [
   { name="Harrison Vanderbyl", email="harrison.vanderbyl@gmail.com" },
 ]
@@ -16,11 +16,12 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  'tokenizers >= 0.13.2',
+  'tokenizers == 0.12.0',
   'rwkv',
   'ninja',
   'tqdm',
   'numpy',
+  'inquirer'
 ]
 
 [project.urls]
