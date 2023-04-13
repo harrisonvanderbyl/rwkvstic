@@ -43,8 +43,8 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
         from rwkvstic.agnostic.backends.opt import OptRWKV
         model = OptRWKV(path, **kwargs)
         import torch
-        from rwkvstic.agnostic.samplers.numpy import npsample
-        return RWKVMaster(model, model.emptyState.clone(), torch.tensor, torch.LongTensor, npsample, tokenizer)
+        from rwkvstic.agnostic.samplers.typical import typical
+        return RWKVMaster(model, model.emptyState.clone(), torch.tensor, torch.LongTensor, typical, tokenizer)
 
     if kwargs.get("strategy", None) is not None:
         return chatRWKV.initRWKVOriginal(path, kwargs["strategy"], tokenizer)
