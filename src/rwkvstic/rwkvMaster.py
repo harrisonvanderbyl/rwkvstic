@@ -101,8 +101,8 @@ class RWKVMaster():
             ctx, state = doContext(
                 self.model, ctx, self.intTensor(newctx), statex, progressCallBack)
         
-        self.myState = state
-        return ctx, state
+        self.myState = clone(state)
+        return ctx, clone(state)
 
     def sample(self, ozut, temp: float = 1.0, top_p_usual: float = 0.8) -> int:
         return self.sampler(ozut, temp, top_p_usual)
