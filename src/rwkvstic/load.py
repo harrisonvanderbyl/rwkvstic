@@ -1,4 +1,7 @@
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 from rwkvstic.agnostic.agnosticRwkv import AgnosticRWKV
 from rwkvstic.agnostic.rnn import RnnRWKV
 from rwkvstic.helpers.loadWeights import loadWeights
@@ -43,7 +46,7 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
         model = OptRWKV(path, **kwargs)
         import torch
         from rwkvstic.agnostic.samplers.numpy import npsample
-        return RWKVMaster(model, model.emptyState, torch.tensor, torch.LongTensor, npsample, tokenizer)
+        return RWKVMaster(model, model.emptyState.clone(), torch.tensor, torch.LongTensor, npsample, tokenizer)
 
     if kwargs.get("strategy", None) is not None:
         return chatRWKV.initRWKVOriginal(path, kwargs["strategy"], tokenizer)

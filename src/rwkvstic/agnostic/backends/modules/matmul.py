@@ -29,13 +29,15 @@ class MM8(RwkvModule):
                 end = start + width
                 x = xx[start:end].t()
                 rang = 255
-                ran, mini = ((x.max(0)[0]).double()-(x.min(0)[0]).double())/rang,  x.min(0)[0].double()
-                out = ((x-mini)/ran)
+                mini = x.min(0)[0].double()
+                out = x-mini
+                ran = out.max(0)[0].double()/rang
+                out = out/ran
                 fractmat = out.frac().double()
                 fractmat = fractmat.mean(0)
                 mini = mini.double() + fractmat*ran.double()
                 
-                return [out.floor().t(),ran.to(torch.float32).to(self.device).clone(), mini.to(self.runtimedtype).to(self.device).clone()]
+                return [out.t(),ran.to(torch.float32).to(self.device).clone(), mini.to(self.runtimedtype).to(self.device).clone()]
 
             def cuda_mm8(self, N:int, M:int, x, w, r):
                 x = x[0]
@@ -49,19 +51,16 @@ class MM8(RwkvModule):
             def forward(self, y):
                 
                 B = y.shape[0]
-                y = y.to(dtype=torch.float32,device=self.device)
+                y = y.to(device=self.device)
                
                 if B > 1:
-                    return ((y*self.range).to(dtype=torch.bfloat16) @ self.weight.to(dtype=torch.bfloat16)).to(dtype=torch.float64) + (y.mv(self.offset)).reshape(-1, 1)
-                
+                    return ((y*self.range.to(y.dtype)).to(dtype=torch.bfloat16) @ self.weight.to(dtype=torch.bfloat16)).to(dtype=torch.float64) + (y.mv(self.offset)).reshape(-1, 1)
+                y = y.to(dtype=torch.float32)
                 zp = y.mul(self.offset).sum()
                 xmain = self.cuda_mm8(self.N, self.M, y, self.weight,self.range)
 
                 return (xmain + zp)
-            
-
-            
-                
+                         
 class MM8_3(MM8):
             def __init__(self, weight,weight1,weight2, device, stream = False):   
                 super(MM8_3, self).__init__(weight,device, stream)
@@ -85,9 +84,9 @@ class MM8_3(MM8):
                 B = y[0].shape[0]
                 
                 if B > 1:
-                    xmain = ((y[0]*self.range.to(torch.float64)).to(torch.bfloat16) @ self.weight.to(self.device).to(torch.bfloat16)).to(torch.float64)
-                    xmain1 = ((y[1]*self.range1.to(torch.float64)).to(torch.bfloat16) @ self.weight1.to(self.device).to(torch.bfloat16)).to(torch.float64)
-                    xmain2 = ((y[2]*self.range2.to(torch.float64)).to(torch.bfloat16) @ self.weight2.to(self.device).to(torch.bfloat16)).to(torch.float64)
+                    xmain = ((y[0]*self.range.to(y[0].dtype)).to(torch.bfloat16) @ self.weight.to(self.device).to(torch.bfloat16)).to(y[0].dtype)
+                    xmain1 = ((y[1]*self.range1.to(y[0].dtype)).to(torch.bfloat16) @ self.weight1.to(self.device).to(torch.bfloat16)).to(y[0].dtype)
+                    xmain2 = ((y[2]*self.range2.to(y[0].dtype)).to(torch.bfloat16) @ self.weight2.to(self.device).to(torch.bfloat16)).to(y[0].dtype)
  
                     zp = (y[0].mv(self.offset)).reshape(-1, 1)
                     zp1 = (y[1].mv(self.offset1)).reshape(-1, 1)
@@ -113,7 +112,6 @@ class Linear3Naive(RwkvModule):
         def forward(self,x:List[torch.Tensor]):
             return x[0].to(device=self.w.device, dtype=self.w.dtype) @ self.w , x[1].to(device=self.w1.device, dtype=self.w1.dtype) @ self.w1 , x[2].to(device=self.w2.device, dtype=self.w2.dtype) @ self.w2
    
-
 class LinearNaive(RwkvModule):
         def __init__(self,w):
             super().__init__()
