@@ -1,6 +1,4 @@
 
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from rwkvstic.agnostic.agnosticRwkv import AgnosticRWKV
 from rwkvstic.agnostic.rnn import RnnRWKV
