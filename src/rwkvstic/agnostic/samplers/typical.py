@@ -1,7 +1,7 @@
 def typical(logits, temp=1.0, tau=0.95, **kwargs):
         import torch
     # do it in pytorch
-        
+        import numpy as np
         probs = torch.nn.functional.softmax(logits.float(), dim=-1)
         logits = -torch.log(probs)
         ent = torch.nansum(logits * probs, dim=-1, keepdim=True)
