@@ -106,7 +106,7 @@ void cuda_mm8_one(int N, int M,
                   float *x,
                   uint8_t *w, int w_stride,
                   float *y,
-                    float *r   
+                  float *r   
                 ) {
     dim3 blockSize(1, MM8_ONE_TILE);
     dim3 gridSize(MM8_ONE_JSPLIT, (M + blockSize.y - 1) / blockSize.y);
