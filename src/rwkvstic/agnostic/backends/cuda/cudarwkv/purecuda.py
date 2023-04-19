@@ -14,11 +14,7 @@ def OptRWKV(path, jit=True, export=False,**kwargs):
 
     class myRWKV(torch.nn.Module):
         def QuantizeMatrix(self, xx):
-                xx = xx.t()
-                width = xx.shape[0]
-                start = 0
-                end = start + width
-                x = xx[start:end].t()
+                x = xx
                 rang = 255
                 mini = x.min(0)[0].double()
                 out = x-mini
@@ -31,7 +27,6 @@ def OptRWKV(path, jit=True, export=False,**kwargs):
                 return [out.t(),ran.to(torch.float32).cuda().clone(), mini.to(torch.float32).cuda().clone()]
         def __init__(self,w,dims,layers):
             super(myRWKV, self).__init__()
-            print("Legacy RWKV")
             
             self.emptyState = layers * [[[0]*dims]*4+[[-1e30]*dims]]
             vustatea = torch.tensor([self.emptyState[i][0] for i in range(layers)]).double().contiguous().cuda()
@@ -80,7 +75,6 @@ def OptRWKV(path, jit=True, export=False,**kwargs):
                 "ffn.value.weight",
                 "ffn.receptance.weight",
                 "att.output.weight"
-
             ]
             for key in toQuantize:
                 weights =[self.QuantizeMatrix(w[f"blocks.{i}.{key}"] ) for i in tqdm(range(layers), desc=f"Quantizing {key}")]
@@ -101,12 +95,6 @@ def OptRWKV(path, jit=True, export=False,**kwargs):
             self.cudahead, self.cudaheadr, self.cudaheadzp = self.QuantizeMatrix(w["head.weight"])
             self.cudahead = self.cudahead.to(dtype=torch.uint8, memory_format=torch.contiguous_format, device="cuda")
             del w
-
-
-            
-            
-            
-            
 
             self.dim = dims
             self.layers = layers
