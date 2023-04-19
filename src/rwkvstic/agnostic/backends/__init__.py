@@ -9,6 +9,7 @@ from typing import Dict
 TORCH = "pytorch(cpu/gpu)"
 JAX = "jax(cpu/gpu/tpu)"
 FASTQUANT = "fastquant"
+FASTQUANTCUDA = "fastquant-cuda"
 TF = "tensorflow(cpu/gpu)"
 CUPY = "cupy(gpu)"
 CUPY_QUANT = "cupy-quant(gpu)"
@@ -21,6 +22,7 @@ NUMPY = "numpy(cpu)"
 
 Backends: Dict[str, module] = {
     (FASTQUANT): RWKVCudaOps,
+    (FASTQUANTCUDA): RWKVCudaOps,
     (TF): RWKVTFOps,
     (JAX): RWKVJaxOps,
     (TORCH): RWKVCudaOps,

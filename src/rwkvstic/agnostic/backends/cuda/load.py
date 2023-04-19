@@ -8,7 +8,6 @@ def loadCustomCudaModule():
         name=f"wkv_cuda",
         sources=[f"{current_path}/wrapper.cpp",
                 f"{current_path}/operators.cu",
-                f"{current_path}/operators32.cu",
-                f"{current_path}/cudarwkv.cu",
+                f"{current_path}/operators32.cu"
                 ],
         )

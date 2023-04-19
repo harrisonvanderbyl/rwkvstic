@@ -14,28 +14,11 @@
 #define EMBSPLIT 64
 #define EMBBLOCK 8
 
-__global__ void cuda_layernormMean(int64_t n_emb, const double *__restrict__ const x, double *__restrict__ const out)
-{
 
-    double xmean = 0;
-    for (int64_t i = 0; i < n_emb; i++)
+__global__ void cuda_layernorm(int64_t n_emb, const double *__restrict__ const x, const double *__restrict__ const weight, int64_t offset, float const inmean, float const instd, double *__restrict__ const out)
     {
-        xmean += x[i] / n_emb;
-    }
-
-    double x2 = 0;
-    for (int64_t i = 0; i < n_emb; i++)
-    {
-        x2 += (x[i] - xmean) * (x[i] - xmean) / n_emb;
-    }
-    x2 = sqrt(x2 + 1e-5);
-    out[0] = xmean;
-    out[1] = x2;
-}
-__global__ void cuda_layernorm(int64_t n_emb, const double *__restrict__ const x, const double *__restrict__ const weight, int64_t offset, double *__restrict__ const in, double *__restrict__ const out)
-    {
-    double xmean = in[0];
-    double x2 = in[1];
+    double xmean = inmean;
+    double x2 = sqrt(instd);
 
     int ii = blockIdx.x*(blockDim.x*EMBBLOCK);
     for(int c = 0; c < EMBBLOCK; c++){
@@ -47,11 +30,8 @@ __global__ void cuda_layernorm(int64_t n_emb, const double *__restrict__ const x
 }
 __global__ void kernel_mm8_threec(
     const int64_t N,
-    const double *__restrict__ const xy,
-    double *__restrict__ const statexy,
-    double *__restrict__ const mixk,
-    double *__restrict__ const mixv,
-    double *__restrict__ const mixr,
+    const float *__restrict__ const xy,
+    
     const uint8_t *__restrict__ const w,
     const uint8_t *__restrict__ const w1,
     const uint8_t *__restrict__ const w2,
@@ -78,9 +58,9 @@ __global__ void kernel_mm8_threec(
         float y2_local = 0;
         for (int j = j0; j < j1; ++j)
         {
-            y_local += float(xy[j] * mixk[j + offset * N] + statexy[j + offset * N] * (1.0 - mixk[j + offset * N])) * ((w[j * N + k + offset * N * N] * r[j + offset * N]) + o1[j + offset * N]);
-            y1_local += float(xy[j] * mixv[j + offset * N] + statexy[j + offset * N] * (1.0 - mixv[j + offset * N])) * ((w1[j * N + k + offset * N * N] * r1[j + offset * N]) + o2[j + offset * N]);
-            y2_local += float(xy[j] * mixr[j + offset * N] + statexy[j + offset * N] * (1.0 - mixr[j + offset * N])) * ((w2[j * N + k + offset * N * N] * r2[j + offset * N]) + o3[j + offset * N]);
+            y_local += xy[j] * ((w[j * N + k + offset * N * N] * r[j + offset * N]) + o1[j + offset * N]);
+            y1_local += xy[j+N] * ((w1[j * N + k + offset * N * N] * r1[j + offset * N]) + o2[j + offset * N]);
+            y2_local += xy[j+N*2] * ((w2[j * N + k + offset * N * N] * r2[j + offset * N]) + o3[j + offset * N]);
         }
         atomicAdd(reinterpret_cast<float *>(&y[k]), *reinterpret_cast<float *>(&y_local));
         atomicAdd(reinterpret_cast<float *>(&y1[k]), *reinterpret_cast<float *>(&y1_local));
@@ -91,11 +71,7 @@ __global__ void kernel_mm8_threec(
 // generic T either float or fp16 or fp64
 
 void cuda_mm8_threec(int64_t N,
-                     double *xy,
-                     double *statexy,
-                     double *mixk,
-                     double *mixv,
-                     double *mixr,
+                     float *xy,
                      uint8_t *w,
                      uint8_t *w1,
                      uint8_t *w2,
@@ -117,10 +93,6 @@ void cuda_mm8_threec(int64_t N,
     kernel_mm8_threec<<<gridSize, blockSize>>>(
         N,
         xy,
-        statexy,
-        mixk,
-        mixv,
-        mixr,
         w,
         w1,
         w2,
@@ -207,7 +179,9 @@ __global__ void cuda_memset(
 }
 __global__ void cuda_relusquared(
     const int emb,
-    float *__restrict__ const a)
+    float *__restrict__ const a,
+    float *__restrict__ const b
+)
 {
     int ii = blockIdx.x*(blockDim.x*EMBBLOCK);
     for(int c = 0; c < EMBBLOCK; c++){
@@ -216,20 +190,29 @@ __global__ void cuda_relusquared(
     if(i < emb){
         a[i] = a[i] * (a[i] > 0);
         a[i] = a[i] * a[i];
+        if(i%4 == 0){
+            b[i/4] = 0.0f;
+        }
     }}
 }
 
 __global__ void sigmoid(
     const int emb,
     float *__restrict__ const a,
-    double *__restrict__ const out)
+    float *__restrict__ const out,
+    float *__restrict__ const d
+)
 {
     int ii = blockIdx.x*(blockDim.x*EMBBLOCK);
     for(int c = 0; c < EMBBLOCK; c++){
         int i = ii + threadIdx.x*EMBBLOCK + c;
     
     if(i < emb){
-        out[i] = 1.0 / (1.0 + exp(-double(a[i])));
+        out[i] = float(1.0 / (1.0 + exp(-double(a[i]))));
+        d[i*4] = 0.0;
+        d[i*4+1] = 0.0;
+        d[i*4+2] = 0.0;
+        d[i*4+3] = 0.0;
     }}
 }
 __global__ void kernel_wkvc_forward(const int C,
@@ -377,11 +360,41 @@ __global__ void mixffn(
     }}
 }
 
+__global__ void mixatt(
+    const int emb,
+    double *__restrict__ const rc,
+    double *__restrict__ const ddd,
+    double *__restrict__ const mixk,
+    double *__restrict__ const mixv,
+    double *__restrict__ const mixr,
+    float *__restrict__ const outkvr,
+    int64_t offset,
+    float* a,
+    float* b,
+    float* cc
+
+)
+{
+    int ii = blockIdx.x*(blockDim.x*EMBBLOCK);
+    for(int c = 0; c < EMBBLOCK; c++){
+        int i = ii + threadIdx.x*EMBBLOCK + c;
+    
+    if(i < emb){
+        outkvr[i] = mixk[i + offset * emb] * rc[i] + (1.0 - mixk[i + offset * emb]) * ddd[i + offset * emb];
+        outkvr[i+emb] = mixv[i + offset * emb] * rc[i] + (1.0 - mixv[i + offset * emb]) * ddd[i + offset * emb];
+        outkvr[i+emb*2] = mixr[i + offset * emb] * rc[i] + (1.0 - mixr[i + offset * emb]) * ddd[i + offset * emb];
+        ddd[i+offset*emb] = rc[i];
+        a[i] = 0.0;
+        b[i] = 0.0;
+        cc[i] = 0.0;
+    }}
+}
+
 __global__ void blockout(
     const int emb,
     double *__restrict__ const x,
     float *__restrict__ const rcm,
-    double *__restrict__ const ddd)
+    float *__restrict__ const ddd)
 {
     int ii = blockIdx.x*(blockDim.x*EMBBLOCK);
     for(int c = 0; c < EMBBLOCK; c++){
@@ -391,6 +404,32 @@ __global__ void blockout(
         x[i] = x[i] + rcm[i] * ddd[i];
     }}
 }
+#include <thrust/transform_reduce.h>
+#include <thrust/device_vector.h>
+#include <thrust/functional.h>
+
+#include <functional>
+#include <cmath>
+
+/*
+ * @struct varianceshifteop
+ * @brief a unary function that shifts input data
+ * by their mean and computes the squares of them
+ */
+struct varianceshifteop
+    : std::unary_function<float, float>
+{
+    varianceshifteop(float m)
+        : mean(m)
+    { /* no-op */ }
+
+    const float mean;
+
+    __device__ float operator()(float data) const
+    {
+        return ::pow(data - mean, 2.0f);
+    }
+};
 
 void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
                double *embed, double *layernorms,
@@ -409,22 +448,42 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
                double *decay, double *bonus,
                uint8_t *head, float *headr, float *heado)
 {
-    cuda_layernormMean<<<1, 1>>>(n_emb, embed, ffnkbuffer);
-    cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, embed, layernorms, 0,ffnkbuffer, x);
+    thrust::device_ptr<double> mp(embed);
+    float ccmean = thrust::reduce(
+        mp,
+        mp+n_emb,
+        0.0f,
+        thrust::plus<float>()) / n_emb;
+    float ccvariance = thrust::transform_reduce(
+        mp,
+        mp+n_emb,
+        varianceshifteop(ccmean),
+        0.0f,
+        thrust::plus<float>()) / (n_emb - 1);
+    cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, embed, layernorms, 0,ccmean,ccvariance, x);
+    thrust::device_ptr<double> xp(x);
 
     for (int64_t i = 0; i < n_layers; i++)
     {
         // xy = ln(x)
         // kmix, vmix, rmix = mix(xy, statexy[n_emb*y], mixkvr)
         // k, v, r = matmul(kmix, km), matmul(vmix, vm), matmul(rmix, rm)
-        cuda_layernormMean<<<1, 1>>>(n_emb, x, ffnkbuffer);
-        cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, layernorms, 4 * (i) + 2,ffnkbuffer, buffer1);
+        float camean = thrust::reduce(
+            xp,
+            xp+n_emb,
+            0.0f,
+            thrust::plus<float>()) / n_emb;
+        float cavariance = thrust::transform_reduce(
+            xp,
+            xp+n_emb,
+            varianceshifteop(camean),
+            0.0f,
+            thrust::plus<float>()) / (n_emb - 1);
+    
+        cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, layernorms, 4 * (i) + 2,camean, cavariance, buffer1);
         // buffers to 0
-        cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer2, 0);
-        cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer3, 0);
-        cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer4, 0);
-        cuda_mm8_threec(n_emb, buffer1, statexy, mixk, mixv, mixr, km, vm, rm, kr, vr, rr, o1, o2, o3, buffer2, buffer3, buffer4, i);
-        setx<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer1, statexy, i);
+        mixatt<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer1, statexy, mixk , mixv , mixr , ffnrbuffer, i,buffer2,buffer3,buffer4);
+        cuda_mm8_threec(n_emb, ffnrbuffer, km, vm, rm, kr, vr, rr, o1, o2, o3, buffer2, buffer3, buffer4, i);
         // buffer2, 3, 4 = k,v,r
 
         cuda_wkvc_forward(n_emb, decay, bonus, buffer2, buffer3, buffer4, buffer1, stateaa, statebb, statepp, i);
@@ -434,8 +493,18 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
         cudac_mm8_one(n_emb, n_emb, buffer1, attout, n_emb, buffer2, attoutr, attouto, i);
         // buffer2 = attout(rwkv) + x
         setx<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer2, x);
-        cuda_layernormMean<<<1, 1>>>(n_emb, x, ffnkbuffer);
-        cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, layernorms, 4 * (i + 1),ffnkbuffer, buffer1);
+        float zzmean = thrust::reduce(
+            xp,
+            xp+n_emb,
+            0.0f,
+            thrust::plus<float>()) / n_emb;
+        float zzvariance = thrust::transform_reduce(
+            xp,
+            xp+n_emb,
+            varianceshifteop(zzmean),
+            0.0f,
+            thrust::plus<float>()) / (n_emb - 1);   
+        cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, layernorms, 4 * (i + 1),zzmean, zzvariance, buffer1);
         // buffer1 = ln(x)
         // ffnmixk, ffnmixv = mix(buffer1, statedd[n_emb*y], ffnmixkvr)
         mixffn<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer1, statedd, ffnmixk, ffnmixv, ffnkbuffer, ffnvbuffer, i);
@@ -443,23 +512,31 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
         // ffnkbuffer, ffnvbuffer = mixk, mixv
         cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer2, 0);
         cudac_mm8_one(n_emb, n_emb, ffnvbuffer, ffnr, n_emb, buffer2, ffnrr, ffnro, i);
-        sigmoid<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer2, ffnvbuffer);
+        sigmoid<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer2, buffer4, ffnrbuffer);
         // ffnvbuffer = sigmoid(ffnrbuffer @ ffnr)
-        cuda_memset<<<(n_emb*4+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb * 4, ffnrbuffer, 0);
         cudac_mm8_one(n_emb, n_emb * 4, ffnkbuffer, ffnk, n_emb * 4, ffnrbuffer, ffnkr, ffnko, i);
         // ffnrbuffer = ffnkbuffer @ ffnk
-        cuda_relusquared<<<(n_emb*4+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb * 4, ffnrbuffer);
-        cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer3, 0);
+        cuda_relusquared<<<(n_emb*4+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb * 4, ffnrbuffer,buffer3);
         cudac_mm8_one(n_emb * 4, n_emb, ffnrbuffer, ffnv, n_emb, buffer3, ffnvr, ffnvo, i);
         // buffer3 = ffnrbuffer @ ffnv
-        blockout<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, buffer3, ffnvbuffer);
+        blockout<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, buffer3, buffer4);
 
         // cuda_layernorm<<<1,1>>>(n_emb, x, layernorms,4*(i)+4, buffer1);
         // setx<<<1,1>>>(n_emb, buffer1, x);
     }
 
-    cuda_layernormMean<<<1, 1>>>(n_emb, x, ffnkbuffer);
-    cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, layernorms, 4 * (n_layers) + 2,ffnkbuffer, buffer1);
+    float mean = thrust::reduce(
+        xp,
+        xp+n_emb,
+        0.0f,
+        thrust::plus<float>()) / n_emb;
+    float variance = thrust::transform_reduce(
+        xp,
+        xp+n_emb,
+        varianceshifteop(mean),
+        0.0f,
+        thrust::plus<float>()) / (n_emb - 1);
+    cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, layernorms, 4 * (n_layers) + 2,mean,variance, buffer1);
     cuda_memset<<<(50277+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(50277, buffer2, 0);
     cudac_mm8_one(n_emb, 50277, buffer1, head, 50277, buffer2, headr, heado, 0);
 }

@@ -11,7 +11,7 @@ from typing import Tuple
 import inquirer
 import os
 import urllib.request
-from rwkvstic.agnostic.backends import FASTQUANT
+from rwkvstic.agnostic.backends import FASTQUANT, FASTQUANTCUDA
 # set torch threads to 8
 
 
@@ -38,9 +38,14 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
             if not os.path.exists(fileName):
                 urllib.request.urlretrieve(path, fileName)
             path = fileName
-    
+    if (mode == FASTQUANTCUDA or path.endswith(".cudarwkv")) and (kwargs.get("strategy", None) is None):
+        from rwkvstic.agnostic.backends.cuda.cudarwkv.purecuda import OptRWKV
+        model = OptRWKV(path, **kwargs)
+        import torch
+        from rwkvstic.agnostic.samplers.typical import typical
+        return RWKVMaster(model, model.emptyState, torch.tensor, torch.LongTensor, typical, tokenizer)
     if (mode == FASTQUANT or path.endswith(".rwkv")) and (kwargs.get("strategy", None) is None):
-        from rwkvstic.agnostic.backends.purecuda import OptRWKV
+        from rwkvstic.agnostic.backends.opt import OptRWKV
         model = OptRWKV(path, **kwargs)
         import torch
         from rwkvstic.agnostic.samplers.typical import typical

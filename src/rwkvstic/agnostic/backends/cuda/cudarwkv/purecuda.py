@@ -1,8 +1,4 @@
 import torch
-from rwkvstic.agnostic.backends.modules.matmul import Linear
-from rwkvstic.agnostic.backends.modules.layernorm import LayerNorm
-from rwkvstic.agnostic.backends.modules.block import Block
-from rwkvstic.agnostic.backends.modules.emb import RwkvEmb, RwkvModule
 from tqdm import tqdm
 
 import os
@@ -13,10 +9,10 @@ current_path = os.path.dirname(os.path.abspath(__file__))
 def OptRWKV(path, jit=True, export=False,**kwargs):
     
 
-    from rwkvstic.agnostic.backends.cuda.load import loadCustomCudaModule
-    loadCustomCudaModule()
+    from rwkvstic.agnostic.backends.cuda.cudarwkv.load import loadModule
+    loadModule()
 
-    class myRWKV(RwkvModule):
+    class myRWKV(torch.nn.Module):
         def QuantizeMatrix(self, xx):
                 xx = xx.t()
                 width = xx.shape[0]
@@ -190,10 +186,11 @@ def OptRWKV(path, jit=True, export=False,**kwargs):
             
         
         
-    if path.endswith(".rwkv"):
+    if path.endswith(".cudarwkv"):
         myrwkv = torch.jit.load(path)
         returnObject: myRWKV = myrwkv
         return returnObject
+    
     w = torch.load(path, map_location="cpu")
     # detach weights
 
