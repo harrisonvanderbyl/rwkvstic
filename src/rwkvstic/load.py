@@ -40,11 +40,11 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
             path = fileName
     
     if (mode == FASTQUANT or path.endswith(".rwkv")) and (kwargs.get("strategy", None) is None):
-        from rwkvstic.agnostic.backends.opt import OptRWKV
+        from rwkvstic.agnostic.backends.purecuda import OptRWKV
         model = OptRWKV(path, **kwargs)
         import torch
         from rwkvstic.agnostic.samplers.typical import typical
-        return RWKVMaster(model, model.emptyState.clone(), torch.tensor, torch.LongTensor, typical, tokenizer)
+        return RWKVMaster(model, model.emptyState, torch.tensor, torch.LongTensor, typical, tokenizer)
 
     if kwargs.get("strategy", None) is not None:
         return chatRWKV.initRWKVOriginal(path, kwargs["strategy"], tokenizer)
