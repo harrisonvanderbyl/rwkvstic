@@ -485,7 +485,14 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
                uint8_t *head, float *headr, float *heado)
 {
     
-
+    // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer1, 0.0);
+    // cuda_memset<<<(50277+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(50277, buffer2, 0.0);
+    // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer3, 0.0);
+    // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer4, 0.0);
+    // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, ffnkbuffer, 0.0);
+    // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, ffnvbuffer, 0.0);
+    // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, 0.0);
+    // cuda_memset<<<(n_emb*4+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb*4, ffnrbuffer, 0.0);
     setxf<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, embed, buffer1, token);
     
     thrust::device_ptr<double> mp(buffer1);
@@ -508,12 +515,13 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
 
     for (int64_t i = 0; i < n_layers; i++)
     {
-        // std::cout << "layer: " << i << std::endl;
-        
-        // std::cout << "layer: " << i << std::endl;
-        // xy = ln(x)
-        // kmix, vmix, rmix = mix(xy, statexy[n_emb*y], mixkvr)
-        // k, v, r = matmul(kmix, km), matmul(vmix, vm), matmul(rmix, rm)
+        // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer1, 0.0);
+        // cuda_memset<<<(50277+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(50277, buffer2, 0.0);
+        // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer3, 0.0);
+        // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer4, 0.0);
+        // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, ffnkbuffer, 0.0);
+        // cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, ffnvbuffer, 0.0);
+        // cuda_memset<<<(n_emb*4+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb*4, ffnrbuffer, 0.0);
         thrust::device_ptr<double> xp(x);
         float camean = thrust::reduce(
             xp,
@@ -562,6 +570,7 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
         // ffnmixk, ffnmixv = mix(buffer1, statedd[n_emb*y], ffnmixkvr)
         mixffn<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer1, statedd, ffnmixk, ffnmixv, ffnkbuffer, ffnvbuffer, i);
         setx<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer1, statedd, i);
+
         // ffnkbuffer, ffnvbuffer = mixk, mixv
         cuda_memset<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer2, 0);
         cudac_mm8_one(n_emb, n_emb, ffnvbuffer, ffnr, n_emb, buffer2, ffnrr, ffnro, i);
@@ -591,24 +600,17 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
         varianceshifteop(mean),
         0.0f,
         thrust::plus<float>()) / (n_emb - 1);
-        std::cout << "mean: " << mean << " variance: " << variance << std::endl;
     cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, layernorms, 4 * (n_layers) + 2,mean,variance, buffer1);
     cuda_memset<<<(50277+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(50277, buffer2, 0);
     cudac_mm8_one(n_emb, 50277, buffer1, head, 50277, buffer2, headr, heado, 0);
 }
 
+unsigned long Mtypes(int64_t i);
+int64_t getSize(int64_t i, int64_t n_layers, int64_t n_embed);
 // ptrs, n_layers, n_embed
 void moveToCuda(int** ptrs, int64_t n_layers, int64_t n_embed){
-    enum {x,embed,layernorms,statexy,stateaa,statebb,statepp,statedd,buffer1,buffer2,buffer3,buffer4,mixk,mixv,mixr,km,vm,rm,kr,vr,rr,o1,o2,o3,attout,attoutr,attouto,ffnmixk,ffnmixv,ffnk,ffnv,ffnr,ffnkr,ffnvr,ffnrr,ffnko,ffnvo,ffnro,ffnkbuffer,ffnvbuffer,ffnrbuffer,decay,bonus,head,headr,heado};
-    int64_t a = n_layers;
-    int64_t b = n_embed;
-    int64_t sizes[46] = {b,50277*b,4*(a+1)*b, a*b,a*b,a*b,a*b,a*b, b, 50277,b,b,a*b,a*b,a*b,a*b*b,a*b*b,a*b*b,a*b,a*b,a*b,a*b,a*b,a*b,a*b*b,a*b,a*b,a*b,a*b,a*b*b,a*b*b*4,a*b*b*4,a*b,a*b*4,a*b,a*b,a*b*4,a*b,b,b,b*4,a*b,a*b,50277*b,b,b};
-    uint64_t f = sizeof(float);
-    uint64_t d = sizeof(double);
-    uint64_t g = sizeof(uint8_t);
-    
-    uint64_t types[46] = {d,f,d,d,d,d,d,d,d,f,f,f,d,d,d,g,g,g,f,f,f,f,f,f,g,f,f,d,d,g,g,g,f,f,f,f,f,f,d,d,f,d,d,g,f,f};
-    for(int i = 0; i < 46; i++){
+
+    for(uint64_t i = 0; i < 46; i++){
         // malloc new cuda memory for ptrs[i]
         // copy ptrs[i] to cuda memory
         // free ptrs[i]
@@ -616,37 +618,37 @@ void moveToCuda(int** ptrs, int64_t n_layers, int64_t n_embed){
 
         // print first and last element
         
-        if(types[i] == sizeof(float)){
+        if(Mtypes(i) == sizeof(float)){
             float first = ((float*)ptrs[i])[0];
-            float last = ((float*)ptrs[i])[sizes[i]-1];
-            printf("float %d: %f %f %d\n", int(i), first, last, int(sizes[i]));
+            float last = ((float*)ptrs[i])[getSize(i,n_layers,n_embed)-1];
+            printf("float %d: %f %f %d\n", int(i), first, last, int(getSize(i,n_layers,n_embed)));
             float* cuda_mem;
-            cudaMalloc(&cuda_mem, sizes[i] * types[i]);
-            cudaMemcpy(cuda_mem, (float*)ptrs[i], sizes[i] * types[i], cudaMemcpyHostToDevice);
+            cudaMalloc(&cuda_mem, getSize(i,n_layers,n_embed) * Mtypes(i));
+            cudaMemcpy(cuda_mem, (float*)ptrs[i], getSize(i,n_layers,n_embed) * Mtypes(i), cudaMemcpyHostToDevice);
             // sync
             cudaDeviceSynchronize();
             free(ptrs[i]);
             ptrs[i] = (int*)cuda_mem;
         }
-        else if(types[i] == sizeof(double)){
+        else if(Mtypes(i) == sizeof(double)){
             double firstd = ((double*)ptrs[i])[0];
-            double lastd = ((double*)ptrs[i])[sizes[i]-1];
-            printf("double %d: %f %f %d\n",  int(i), firstd, lastd, int(sizes[i]));
+            double lastd = ((double*)ptrs[i])[getSize(i,n_layers,n_embed)-1];
+            printf("double %d: %f %f %d\n",  int(i), firstd, lastd, int(getSize(i,n_layers,n_embed)));
             double* cuda_mem;
-            cudaMalloc(&cuda_mem, sizes[i] * types[i]);
-            cudaMemcpy(cuda_mem, (double*)ptrs[i], sizes[i] * types[i], cudaMemcpyHostToDevice);
+            cudaMalloc(&cuda_mem, getSize(i,n_layers,n_embed) * Mtypes(i));
+            cudaMemcpy(cuda_mem, (double*)ptrs[i], getSize(i,n_layers,n_embed) * Mtypes(i), cudaMemcpyHostToDevice);
             // sync
             cudaDeviceSynchronize();
             free(ptrs[i]);
             ptrs[i] = (int*)cuda_mem;
         }
-        else if(types[i] == sizeof(uint8_t)){
+        else if(Mtypes(i) == sizeof(uint8_t)){
             uint8_t firstu = ((uint8_t*)ptrs[i])[0];
-            uint8_t lastu = ((uint8_t*)ptrs[i])[sizes[i]-1];
-            printf("uint8_t %d: %d %d %d\n",  int(i), int(firstu), int(lastu), int(sizes[i]));
+            uint8_t lastu = ((uint8_t*)ptrs[i])[getSize(i,n_layers,n_embed)-1];
+            printf("uint8_t %d: %d %d %d\n",  int(i), int(firstu), int(lastu), int(getSize(i,n_layers,n_embed)));
             uint8_t* cuda_mem;
-            cudaMalloc(&cuda_mem, sizes[i] * types[i]);
-            cudaMemcpy(cuda_mem, (uint8_t*)ptrs[i], sizes[i] * types[i], cudaMemcpyHostToDevice);
+            cudaMalloc(&cuda_mem, getSize(i,n_layers,n_embed) * Mtypes(i));
+            cudaMemcpy(cuda_mem, (uint8_t*)ptrs[i], getSize(i,n_layers,n_embed) * Mtypes(i), cudaMemcpyHostToDevice);
             // sync
             cudaDeviceSynchronize();
             free(ptrs[i]);

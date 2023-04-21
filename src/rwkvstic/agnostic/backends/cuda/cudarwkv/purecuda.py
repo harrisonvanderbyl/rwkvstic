@@ -31,11 +31,11 @@ def OptRWKV(path, jit=True, export=False,**kwargs):
             self.rnnOnly = True
             self.output = torch.zeros(50277,dtype=torch.float32).cuda()
         def forward(self, x, state:list[torch.Tensor]):
-            state[0] *= 0
-            state[1] *= 0
-            state[2] *= 0
-            state[3] *= 0
-            state[4] *= 0
+            # state[0] *= 0
+            # state[1] *= 0
+            # state[2] *= 0
+            # state[3] *= 0
+            # state[4] *= 0
             # self.output *= 0
             # torch.cuda.synchronize()
             torch.ops.rwkv.attachState(state[0],state[1],state[2],state[3],state[4])
