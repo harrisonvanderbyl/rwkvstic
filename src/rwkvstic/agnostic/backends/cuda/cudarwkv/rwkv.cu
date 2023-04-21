@@ -11,7 +11,7 @@
 #include <cuda_fp16.h>
 #define MM8_ONE_JSPLIT 16
 #define MM8_ONE_TILE 1024
-#define EMBSPLIT 64
+#define EMBSPLIT 512
 #define EMBBLOCK 8
 
 
@@ -148,6 +148,20 @@ __global__ void setx(
     
     if(i < emb){
         b[i + offset * emb] = float(a[i]);
+    }}
+}
+__global__ void setxf(
+    const int emb,
+    float *__restrict__ const a,
+    double *__restrict__ const b,
+    int64_t offset = 0)
+{
+    int ii = blockIdx.x*(blockDim.x*EMBBLOCK);
+    for(int c = 0; c < EMBBLOCK; c++){
+        int i = ii + threadIdx.x*EMBBLOCK + c;
+    
+    if(i < emb){
+        b[i] = double(a[i+ offset * emb]);
     }}
 }
 __global__ void cuda_memset(
@@ -432,7 +446,7 @@ struct varianceshifteop
 };
 
 void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
-               double *embed, double *layernorms,
+               float *embed, double *layernorms,
                double *statexy, double *stateaa, double *statebb, double *statepp, double *statedd,
                double *buffer1, float *buffer2, float *buffer3, float *buffer4,
                double *mixk, double *mixv, double *mixr,
@@ -448,7 +462,10 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
                double *decay, double *bonus,
                uint8_t *head, float *headr, float *heado)
 {
-    thrust::device_ptr<double> mp(embed);
+    
+    setxf<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, embed, buffer1, token);
+    
+    thrust::device_ptr<double> mp(buffer1);
     float ccmean = thrust::reduce(
         mp,
         mp+n_emb,
@@ -460,7 +477,8 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
         varianceshifteop(ccmean),
         0.0f,
         thrust::plus<float>()) / (n_emb - 1);
-    cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, embed, layernorms, 0,ccmean,ccvariance, x);
+    
+    cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, buffer1, layernorms, 0,ccmean,ccvariance, x);
     thrust::device_ptr<double> xp(x);
 
     for (int64_t i = 0; i < n_layers; i++)
@@ -539,4 +557,67 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
     cuda_layernorm<<<(n_emb+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_emb, x, layernorms, 4 * (n_layers) + 2,mean,variance, buffer1);
     cuda_memset<<<(50277+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(50277, buffer2, 0);
     cudac_mm8_one(n_emb, 50277, buffer1, head, 50277, buffer2, headr, heado, 0);
+}
+
+// ptrs, n_layers, n_embed
+void moveToCuda(int** ptrs, int64_t n_layers, int64_t n_embed){
+    enum {x,embed,layernorms,statexy,stateaa,statebb,statepp,statedd,buffer1,buffer2,buffer3,buffer4,mixk,mixv,mixr,km,vm,rm,kr,vr,rr,o1,o2,o3,attout,attoutr,attouto,ffnmixk,ffnmixv,ffnk,ffnv,ffnr,ffnkr,ffnvr,ffnrr,ffnko,ffnvo,ffnro,ffnkbuffer,ffnvbuffer,ffnrbuffer,decay,bonus,head,headr,heado};
+    int64_t a = n_layers;
+    int64_t b = n_embed;
+    int64_t sizes[46] = {b,50277*b,4*(a+1)*b, a*b,a*b,a*b,a*b,a*b, b, 50277,b,b,a*b,a*b,a*b,a*b*b,a*b*b,a*b*b,a*b,a*b,a*b,a*b,a*b,a*b,a*b*b,a*b,a*b,a*b,a*b,a*b*b,a*b*b*4,a*b*b*4,a*b,a*b*4,a*b,a*b,a*b*4,a*b,b,b,b*4,a*b,a*b,50277*b,b,b};
+    uint64_t f = sizeof(float);
+    uint64_t d = sizeof(double);
+    uint64_t g = sizeof(uint8_t);
+    
+    uint64_t types[46] = {d,f,d,d,d,d,d,d,d,f,f,f,d,d,d,g,g,g,f,f,f,f,f,f,g,f,f,d,d,g,g,g,f,f,f,f,f,f,d,d,f,d,d,g,f,f};
+    for(int i = 0; i < 46; i++){
+        // malloc new cuda memory for ptrs[i]
+        // copy ptrs[i] to cuda memory
+        // free ptrs[i]
+        // ptrs[i] = cuda memory
+
+        // print first and last element
+        
+        if(types[i] == sizeof(float)){
+            float first = ((float*)ptrs[i])[0];
+            float last = ((float*)ptrs[i])[sizes[i]-1];
+            printf("float %d: %f %f %d\n", int(i), first, last, int(sizes[i]));
+            float* cuda_mem;
+            cudaMalloc(&cuda_mem, sizes[i] * types[i]);
+            cudaMemcpy(cuda_mem, (float*)ptrs[i], sizes[i] * types[i], cudaMemcpyHostToDevice);
+            // sync
+            cudaDeviceSynchronize();
+            free(ptrs[i]);
+            ptrs[i] = (int*)cuda_mem;
+        }
+        else if(types[i] == sizeof(double)){
+            double firstd = ((double*)ptrs[i])[0];
+            double lastd = ((double*)ptrs[i])[sizes[i]-1];
+            printf("double %d: %f %f %d\n",  int(i), firstd, lastd, int(sizes[i]));
+            double* cuda_mem;
+            cudaMalloc(&cuda_mem, sizes[i] * types[i]);
+            cudaMemcpy(cuda_mem, (double*)ptrs[i], sizes[i] * types[i], cudaMemcpyHostToDevice);
+            // sync
+            cudaDeviceSynchronize();
+            free(ptrs[i]);
+            ptrs[i] = (int*)cuda_mem;
+        }
+        else if(types[i] == sizeof(uint8_t)){
+            uint8_t firstu = ((uint8_t*)ptrs[i])[0];
+            uint8_t lastu = ((uint8_t*)ptrs[i])[sizes[i]-1];
+            printf("uint8_t %d: %d %d %d\n",  int(i), int(firstu), int(lastu), int(sizes[i]));
+            uint8_t* cuda_mem;
+            cudaMalloc(&cuda_mem, sizes[i] * types[i]);
+            cudaMemcpy(cuda_mem, (uint8_t*)ptrs[i], sizes[i] * types[i], cudaMemcpyHostToDevice);
+            // sync
+            cudaDeviceSynchronize();
+            free(ptrs[i]);
+            ptrs[i] = (int*)cuda_mem;
+        }
+        
+        
+        
+    }
+    // sync
+    cudaDeviceSynchronize();
 }

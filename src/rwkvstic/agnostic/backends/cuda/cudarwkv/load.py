@@ -5,6 +5,7 @@ def loadModule():
     load(
         name=f"wkv_cuda",
         sources=[f"{current_path}/rwkv.cpp",
+                 
                 f"{current_path}/rwkv.cu",
                 ],
         )

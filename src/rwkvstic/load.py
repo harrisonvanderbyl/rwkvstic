@@ -21,7 +21,7 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
         files = os.listdir()
         # filter by ending in .pth
         files = [f for f in files if f.endswith(
-            ".pth") or f.endswith(".rwkv") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth") or f.endswith(".jax.npy") or f.endswith(".safetensors") or f.endswith(".onnx") or f.endswith(".ort")]
+            ".pth") or f.endswith(".rwkv") or f.endswith(".bin") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth") or f.endswith(".jax.npy") or f.endswith(".safetensors") or f.endswith(".onnx") or f.endswith(".ort")]
 
         questions = [
             inquirer.List('file',
@@ -38,7 +38,7 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
             if not os.path.exists(fileName):
                 urllib.request.urlretrieve(path, fileName)
             path = fileName
-    if (mode == FASTQUANTCUDA or path.endswith(".cudarwkv")) and (kwargs.get("strategy", None) is None):
+    if (mode == FASTQUANTCUDA or path.endswith(".bin")) and (kwargs.get("strategy", None) is None):
         from rwkvstic.agnostic.backends.cuda.cudarwkv.purecuda import OptRWKV
         model = OptRWKV(path, **kwargs)
         import torch
