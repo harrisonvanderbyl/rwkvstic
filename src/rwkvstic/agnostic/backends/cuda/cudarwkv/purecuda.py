@@ -22,21 +22,29 @@ def OptRWKV(path, jit=True, export=False,**kwargs):
     class interop():
         def __init__(self):
             self.emptyState = [
-                torch.zeros(layers*embed,dtype=torch.float64).cuda().contiguous(),
-                torch.zeros(layers*embed,dtype=torch.float64).cuda().contiguous(),
-                torch.zeros(layers*embed,dtype=torch.float64).cuda().contiguous(),
-                torch.zeros(layers*embed,dtype=torch.float64).cuda().contiguous()+-1e30,
-                torch.zeros(layers*embed,dtype=torch.float64).cuda().contiguous(),
+                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
+                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
+                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
+                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
+                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
             ]
             self.rnnOnly = True
             self.output = torch.zeros(50277,dtype=torch.float32).cuda()
         def forward(self, x, state:list[torch.Tensor]):
-            self.output *= 0
-            torch.ops.rwkv.attachState(state[0],state[1],state[2],state[3],state[4], self.output)
+            state[0] *= 0
+            state[1] *= 0
+            state[2] *= 0
+            state[3] *= 0
+            state[4] *= 0
+            # self.output *= 0
+            # torch.cuda.synchronize()
+            torch.ops.rwkv.attachState(state[0],state[1],state[2],state[3],state[4])
             # print(x[-1].item())
-            torch.ops.rwkv.rwkvc(x[-1].item())
+            torch.ops.rwkv.rwkvc(0)
+            torch.ops.rwkv.getState(state[0],state[1],state[2],state[3],state[4], self.output)
             torch.cuda.synchronize()
-            return self.output, self.emptyState
+            # print(self.output)
+            return self.output, state
         
     return interop()
     # class myRWKV(torch.nn.Module):

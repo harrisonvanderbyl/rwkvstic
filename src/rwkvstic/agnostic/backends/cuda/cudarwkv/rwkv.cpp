@@ -401,17 +401,30 @@ void moveToCuda(int** ptrs, int64_t n_layers, int64_t n_embed);
 void moveToCudaWrapper(){
     moveToCuda(ptrs, num_layers, num_embed);
 }
-
+void setState(int64_t n_embed, int64_t n_layers,
+    double* stateaa, double* statebb, double* statecc, double* statedd, double* stateee,
+    double* instateaa, double* instatebb, double* instatecc, double* instatedd, double* instateee);
 // the only pytorch connection, comment out to use elsewhere
-void attachState(torch::Tensor xy, torch::Tensor aa, torch::Tensor bb, torch::Tensor pp, torch::Tensor dd, torch::Tensor out){
+void attachState(torch::Tensor xy, torch::Tensor aa, torch::Tensor bb, torch::Tensor pp, torch::Tensor dd){
     enum {x,embed,layernorms,statexy,stateaa,statebb,statepp,statedd,buffer1,buffer2,buffer3,buffer4,mixk,mixv,mixr,km,vm,rm,kr,vr,rr,o1,o2,o3,attout,attoutr,attouto,ffnmixk,ffnmixv,ffnk,ffnv,ffnr,ffnkr,ffnvr,ffnrr,ffnko,ffnvo,ffnro,ffnkbuffer,ffnvbuffer,ffnrbuffer,decay,bonus,head,headr,heado};
     
-    ptrs[statexy] = (int*)xy.data_ptr();
-    ptrs[stateaa] = (int*)aa.data_ptr();
-    ptrs[statebb] = (int*)bb.data_ptr();
-    ptrs[statepp] = (int*)pp.data_ptr();
-    ptrs[statedd] = (int*)dd.data_ptr();
-    ptrs[buffer2] = (int*)out.data_ptr();
+    setState(num_embed, num_layers, 
+        (double*)ptrs[statexy], (double*)ptrs[stateaa], (double*)ptrs[statebb], (double*)ptrs[statepp], (double*)ptrs[statedd],
+        xy.data_ptr<double>(), aa.data_ptr<double>(), bb.data_ptr<double>(), pp.data_ptr<double>(), dd.data_ptr<double>()    
+    );
+    
+}
+void getOutput(float* in, float* out);
+void getState(torch::Tensor xy, torch::Tensor aa, torch::Tensor bb, torch::Tensor pp, torch::Tensor dd, torch::Tensor out){
+    enum {x,embed,layernorms,statexy,stateaa,statebb,statepp,statedd,buffer1,buffer2,buffer3,buffer4,mixk,mixv,mixr,km,vm,rm,kr,vr,rr,o1,o2,o3,attout,attoutr,attouto,ffnmixk,ffnmixv,ffnk,ffnv,ffnr,ffnkr,ffnvr,ffnrr,ffnko,ffnvo,ffnro,ffnkbuffer,ffnvbuffer,ffnrbuffer,decay,bonus,head,headr,heado};
+    
+    setState(num_embed, num_layers, 
+    xy.data_ptr<double>(), aa.data_ptr<double>(), bb.data_ptr<double>(), pp.data_ptr<double>(), dd.data_ptr<double>(),
+        (double*)ptrs[statexy], (double*)ptrs[stateaa], (double*)ptrs[statebb], (double*)ptrs[statepp], (double*)ptrs[statedd]
+    );
+
+    // copy buffer2 to out
+    getOutput((float*)ptrs[buffer2],out.data_ptr<float>());
 }
 
 
@@ -421,6 +434,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("load", &load, "load");
     m.def("toCuda", &moveToCudaWrapper, "toCuda");
     m.def("attachState", &attachState, "attachState");
+    m.def("getState", &getState, "getState");
 
 }
 
@@ -429,4 +443,5 @@ TORCH_LIBRARY(rwkv, m) {
     m.def("load", load);
     m.def("toCuda", moveToCudaWrapper);
     m.def("attachState", attachState);
+    m.def("getState", getState);
 }

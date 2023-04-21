@@ -105,14 +105,14 @@ def OptRWKV(path):
             self.dim = dims
             self.layers = layers
             
-            self.rx = torch.zeros((self.dim), dtype = torch.double)
-            self.buffer0 = torch.zeros(self.dim, dtype=torch.double)
-            self.buffer1 = torch.zeros(50277, dtype=torch.float)
-            self.buffer2 = torch.zeros(self.dim, dtype=torch.float)
-            self.buffer3 = torch.zeros(self.dim, dtype=torch.float)
-            self.ffnvbuf = torch.zeros(self.dim, dtype=torch.double)
-            self.ffnkbuf = torch.zeros(self.dim, dtype=torch.double)
-            self.ffkeybuffer = torch.zeros(self.dim*4, dtype=torch.float)       
+            self.rx = torch.arange((self.dim), dtype = torch.double)
+            self.buffer0 = torch.arange(self.dim, dtype=torch.double)
+            self.buffer1 = torch.arange(50277, dtype=torch.float)
+            self.buffer2 = torch.arange(self.dim, dtype=torch.float)
+            self.buffer3 = torch.arange(self.dim, dtype=torch.float)
+            self.ffnvbuf = torch.arange(self.dim, dtype=torch.double)
+            self.ffnkbuf = torch.arange(self.dim, dtype=torch.double)
+            self.ffkeybuffer = torch.arange(self.dim*4, dtype=torch.float)       
 
             
         def forward(self):
