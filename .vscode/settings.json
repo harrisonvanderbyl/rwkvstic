@@ -56,6 +56,11 @@
     "streambuf": "cpp",
     "thread": "cpp",
     "cfenv": "cpp",
-    "typeinfo": "cpp"
-  }
+    "typeinfo": "cpp",
+    "codecvt": "cpp",
+    "fstream": "cpp",
+    "unordered_set": "cpp",
+    "sstream": "cpp"
+  },
+  "C_Cpp.errorSquiggles": "disabled"
 }

@@ -167,57 +167,7 @@ def OptRWKV(path):
                 self.cudaheadr,
                 self.cudaheadzp
             )
-            print("embed: ",self.emb[0][0],":", self.emb[-1][-1])
-            print("layernorms:", self.cudalnin[0][0],":", self.cudalnin[-1][-1])
-            print("emptystate0:", self.emptyState[0][0][0],":", self.emptyState[0][0][-1])
-            print("emptystate1:", self.emptyState[1][0][0],":", self.emptyState[1][0][-1])
-            print("emptystate2:", self.emptyState[2][0][0],":", self.emptyState[2][0][-1])
-            print("emptystate3:", self.emptyState[3][0][0],":", self.emptyState[3][0][-1])
-            print("emptystate4:", self.emptyState[4][0][0],":", self.emptyState[4][0][-1])
-            print("mixk:", self.mixk[0][0],":", self.mixk[-1][-1])
-            print("mixv:", self.mixv[0][0],":", self.mixv[-1][-1])
-            print("mixr:", self.mixr[0][0],":", self.mixr[-1][-1])
-            print("attkeyweights:", self.attkeyweights[0][0][0],":", self.attkeyweights[-1][-1][-1])
-            print("attvalueweights:", self.attvalueweights[0][0][0],":", self.attvalueweights[-1][-1][-1])
-            print("attreceptanceweights:", self.attreceptanceweights[0][0][0],":", self.attreceptanceweights[-1][-1][-1])
-            print("attkeyranges:", self.attkeyranges[0][0],":", self.attkeyranges[-1][-1])
-            print("attvalueranges:", self.attvalueranges[0][0],":", self.attvalueranges[-1][-1])
-            print("attreceptanceranges:", self.attreceptanceranges[0][0],":", self.attreceptanceranges[-1][-1])
-            print("attkeyzp:", self.attkeyzp[0][0],":", self.attkeyzp[-1][-1])
-            print("attvaluezp:", self.attvaluezp[0][0],":", self.attvaluezp[-1][-1])
-            print("attreceptancezp:", self.attreceptancezp[0][0],":", self.attreceptancezp[-1][-1])
-            print("attoutputweights:", self.attoutputweights[0][0][0],":", self.attoutputweights[-1][-1][-1])
-            print("attoutputranges:", self.attoutputranges[0][0],":", self.attoutputranges[-1][-1])
-            print("attoutputzp:", self.attoutputzp[0][0],":", self.attoutputzp[-1][-1])
-            print("mixffnk:", self.mixffnk[0][0],":", self.mixffnk[-1][-1])
-            print("mixffnr:", self.mixffnr[0][0],":", self.mixffnr[-1][-1])
-            print("ffnkeyweights:", self.ffnkeyweights[0][0][0],":", self.ffnkeyweights[-1][-1][-1])
-            print("ffnvalueweights:", self.ffnvalueweights[0][0][0],":", self.ffnvalueweights[-1][-1][-1])
-            print("ffnreceptanceweights:", self.ffnreceptanceweights[0][0][0],":", self.ffnreceptanceweights[-1][-1][-1])
-            print("ffnkeyranges:", self.ffnkeyranges[0][0],":", self.ffnkeyranges[-1][-1])
-            print("ffnvalueranges:", self.ffnvalueranges[0][0],":", self.ffnvalueranges[-1][-1])
-            print("ffnreceptanceranges:", self.ffnreceptanceranges[0][0],":", self.ffnreceptanceranges[-1][-1])
-            print("ffnkeyzp:", self.ffnkeyzp[0][0],":", self.ffnkeyzp[-1][-1])
-            print("ffnvaluezp:", self.ffnvaluezp[0][0],":", self.ffnvaluezp[-1][-1])
-            print("ffnreceptancezp:", self.ffnreceptancezp[0][0],":", self.ffnreceptancezp[-1][-1])
-            print("ffnkbuf:", self.ffnkbuf[0],":", self.ffnkbuf[-1])
-            print("ffnvbuf:", self.ffnvbuf[0],":", self.ffnvbuf[-1])
-            print("ffkeybuffer:", self.ffkeybuffer[0],":", self.ffkeybuffer[-1])
-            print("decay:", self.decay[0][0],":", self.decay[-1][-1])
-            print("bonus:", self.bonus[0][0],":", self.bonus[-1][-1])
-            print("cudahead:", self.cudahead[0][0],":", self.cudahead[-1][-1])
-            print("cudaheadr:", self.cudaheadr[0],":", self.cudaheadr[-1])
-            print("cudaheadzp:", self.cudaheadzp[0],":", self.cudaheadzp[-1])
-            
 
-            
-            
-        
-       
-            
-        
-        
-    
     w = torch.load(path, map_location="cpu")
     # detach weights
 

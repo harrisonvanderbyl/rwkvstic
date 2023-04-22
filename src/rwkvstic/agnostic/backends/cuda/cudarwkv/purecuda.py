@@ -6,38 +6,43 @@ import os
 current_path = os.path.dirname(os.path.abspath(__file__))
 
 
-def OptRWKV(path, jit=True, export=False,**kwargs):
+def OptRWKV(path, **kwargs):
     
-    if export:
-        from rwkvstic.agnostic.backends.cuda.cudarwkv.export import OptRWKV as save
+    if path.endswith(".pth"):
+        from rwkvstic.agnostic.backends.cuda.cudarwkv.export.export import OptRWKV as save
         return save(path)
     
-    from rwkvstic.agnostic.backends.cuda.cudarwkv.load import loadModule
-    loadModule()
+    from torch.utils.cpp_extension import load
+    import os
+    current_path = os.path.dirname(os.path.abspath(__file__))
+    
+    load(
+        name=f"wkv_cuda",
+        sources=[f"{current_path}/torchbind.cpp",
+                f"{current_path}/rwkv.cu",
+                ],
+        )
     layers,embed = torch.ops.rwkv.load(path)
     print(layers,embed)
-    torch.ops.rwkv.toCuda()
     
 
     class interop():
         def __init__(self):
+            self.output = torch.zeros(50277,dtype=torch.float32)
+            self.state = torch.ops.rwkv.attachState(self.output)
             self.emptyState = [
-                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
-                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
-                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
-                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
-                torch.zeros(layers,embed,dtype=torch.float64).cuda().contiguous(),
-            ]
+                torch.zeros(layers,embed,dtype=torch.float64)
+            ]*5
             self.rnnOnly = True
-            self.output = torch.zeros(50277,dtype=torch.float32).cuda()
+            
         def forward(self, x, state:list[torch.Tensor]):
-
-            torch.ops.rwkv.attachState(state[0],state[1],state[2],state[3],state[4])
-
+            for i,o in enumerate(state):
+                # copy values in without changing the pointer
+                self.state[i].copy_(o)
+            
             torch.ops.rwkv.rwkvc(x[-1].item())
-            torch.ops.rwkv.getState(state[0],state[1],state[2],state[3],state[4], self.output)
             torch.cuda.synchronize()
             
-            return self.output, state
+            return self.output, self.emptyState
         
     return interop()

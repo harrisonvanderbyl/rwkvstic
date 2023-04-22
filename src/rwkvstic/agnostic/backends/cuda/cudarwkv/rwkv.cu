@@ -459,19 +459,29 @@ struct varianceshifteop
     }
 };
 
+void getOutput(int64_t n_embed, int64_t n_layers, float* logitsin, double* statexyin, double* stateaain, double* statebbin, double* stateppin, double* stateddin, 
+                                                float* logitsout, double* statexyout, double* stateaaout, double* statebbout, double* stateppout, double* stateddout){
+    // copy gpu tensor in to cpu tensor out
+    cudaMemcpy(logitsout, logitsin, 50277*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(statexyout, statexyin, n_embed*n_layers*sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(stateaaout, stateaain, n_embed*n_layers*sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(statebbout, statebbin, n_embed*n_layers*sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(stateppout, stateppin, n_embed*n_layers*sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(stateddout, stateddin, n_embed*n_layers*sizeof(double), cudaMemcpyDeviceToHost);
+    
+};
+
 void setState(int64_t n_embed, int64_t n_layers,
     double* stateaa, double* statebb, double* statecc, double* statedd, double* stateee,
     double* instateaa, double* instatebb, double* instatecc, double* instatedd, double* instateee){
-    setx<<<(n_embed*n_layers +EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_embed*n_layers, instateaa, stateaa);
-    setx<<<(n_embed*n_layers +EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_embed*n_layers, instatebb, statebb);
-    setx<<<(n_embed*n_layers +EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_embed*n_layers, instatecc, statecc);
-    setx<<<(n_embed*n_layers +EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_embed*n_layers, instatedd, statedd);
-    setx<<<(n_embed*n_layers +EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(n_embed*n_layers, instateee, stateee);
-}
-
-void getOutput(float* in, float* out){
-    setx<<<(50277+EMBSPLIT-1)/EMBSPLIT, EMBSPLIT/EMBBLOCK>>>(50277, in, out);
-}
+    
+    // copy cpu tensor to gpu
+    cudaMemcpy(stateaa, instateaa, n_embed*n_layers*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(statebb, instatebb, n_embed*n_layers*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(statecc, instatecc, n_embed*n_layers*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(statedd, instatedd, n_embed*n_layers*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(stateee, instateee, n_embed*n_layers*sizeof(double), cudaMemcpyHostToDevice);
+};
 
 void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
                float *embed, double *layernorms,
@@ -586,19 +596,47 @@ void cuda_rwkv(int64_t n_layers, int64_t n_emb, int64_t token, double *x,
     cudac_mm8_one(n_emb, 50277, buffer1, head, 50277, buffer2, headr, heado, 0);
 }
 
+// this lazy loads the model from disk
+
 unsigned long Mtypes(int64_t i);
 int64_t getSize(int64_t i, int64_t n_layers, int64_t n_embed);
+char* getName(int64_t i);
 // ptrs, n_layers, n_embed
-void moveToCuda(int** ptrs, int64_t n_layers, int64_t n_embed){
 
-    for(uint64_t i = 0; i < 46; i++){
-        // malloc new cuda memory for ptrs[i]
-        // copy ptrs[i] to cuda memory
-        // free ptrs[i]
-        // ptrs[i] = cuda memory
 
-        // print first and last element
-        
+
+std::tuple<int64_t,int64_t> load (const std::string& filename, int** ptrs) {
+    std::ifstream binfile(filename, std::ios::in | std::ios::binary);
+    if (!binfile.is_open()) {
+        std::cout << "Error opening file " << filename << std::endl;
+        exit(1);
+    }
+
+    // get n_layers
+    // get n_embed
+    int64_t n_layers, n_embed;
+    binfile.read((char*)&n_layers, sizeof(int64_t));
+    binfile.read((char*)&n_embed, sizeof(int64_t));
+    // print
+    std::cout << "n_layers: " << n_layers << std::endl;
+    std::cout << "n_embed: " << n_embed << std::endl;
+  
+
+    for(int64_t i = 0; i < 46; i++) {
+        int64_t size = getSize(i, n_layers, n_embed);
+        if(Mtypes(i) == sizeof(double)){
+            ptrs[i] = (int*)(new double[size]);
+        } else if(Mtypes(i) == sizeof(float)) {
+            ptrs[i] = (int*)(new float[size]);
+        } else if(Mtypes(i) == sizeof(uint8_t)) {
+            ptrs[i] = (int*)(new uint8_t[size]);
+        } else {
+            std::cout << "Error: size not supported" << std::endl;
+            exit(1);
+        }
+        std::cout << "loading: " << getName(i) << "\n";
+        binfile.read((char*)(ptrs[i]), size*Mtypes(i));
+
         if(Mtypes(i) == sizeof(float)){
             float first = ((float*)ptrs[i])[0];
             float last = ((float*)ptrs[i])[getSize(i,n_layers,n_embed)-1];
@@ -635,10 +673,13 @@ void moveToCuda(int** ptrs, int64_t n_layers, int64_t n_embed){
             free(ptrs[i]);
             ptrs[i] = (int*)cuda_mem;
         }
-        
-        
-        
     }
-    // sync
-    cudaDeviceSynchronize();
+    
+    binfile.close();
+
+    //   // return an array of pointers
+
+    // return (n_layers, n_embed)
+    return std::make_tuple(n_layers, n_embed);
+
 }
