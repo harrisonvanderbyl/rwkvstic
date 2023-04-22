@@ -31,8 +31,8 @@ def OptRWKV(path, **kwargs):
             self.output = torch.zeros(50277,dtype=torch.float32)
             self.state = torch.ops.rwkv.attachState(self.output)
             self.emptyState = [
-                torch.zeros(layers,embed,dtype=torch.float64)
-            ]*5
+                self.state[i].clone() for i in range(5)
+            ]
             self.rnnOnly = True
             
         def forward(self, x, state:list[torch.Tensor]):
@@ -43,6 +43,6 @@ def OptRWKV(path, **kwargs):
             torch.ops.rwkv.rwkvc(x[-1].item())
             torch.cuda.synchronize()
             
-            return self.output, self.emptyState
+            return self.output, [o.clone() for o in self.state]
         
     return interop()
