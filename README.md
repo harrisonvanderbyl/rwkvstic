@@ -445,7 +445,7 @@ from rwkvstic.load import RWKV
 from rwkvstic.agnostic.backends import ONNX_EXPORT
 import torch
 
-model = RWKV("model.pth", backend=ONNX_EXPORT, dtype=torch.float16) # or torch.float32
+model = RWKV("model.pth", mode=ONNX_EXPORT, dtype=torch.float16) # or torch.float32
 # the model is exported to model_{layers}_{embed}.onnx
 # the external data is stored in model_{layers}_{embed}.bin
 ```
