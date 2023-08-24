@@ -7,7 +7,6 @@ from rwkvstic.agnostic.backends import Backends
 from rwkvstic.interOpLoaders import tflite, torchscript, prequantized, preJax, rwkvRs, onnx, chatRWKV
 from rwkvstic.rwkvMaster import RWKVMaster
 import gc
-from typing import Tuple
 import inquirer
 import os
 import urllib.request
@@ -15,7 +14,7 @@ from rwkvstic.agnostic.backends import FASTQUANT
 # set torch threads to 8
 
 
-def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, **kwargs) -> RWKVMaster:
+def RWKV(path=None, mode: str | None = FASTQUANT, *args, tokenizer=None, **kwargs) -> RWKVMaster:
 
     if (path == None):
         files = os.listdir()
@@ -23,12 +22,14 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
         files = [f for f in files if f.endswith(
             ".pth") or f.endswith(".rwkv") or f.endswith(".pt") or f.endswith(".tflite") or f.endswith(".pqth") or f.endswith(".jax.npy") or f.endswith(".safetensors") or f.endswith(".onnx") or f.endswith(".ort")]
 
-        questions = [
-            inquirer.List('file',
-                          message="What model do you want to use?",
-                          choices=files,
-                          )]
-        path = inquirer.prompt(questions)["file"]
+        questions = [inquirer.List(
+            'file',
+            message="What model do you want to use?",
+            choices=files,
+        )]
+        _path = inquirer.prompt(questions)
+        assert _path is not None
+        path = _path["file"]
     else:
         if ("http" in path):
             fileName = path.split("/")[-1]
@@ -67,10 +68,13 @@ def RWKV(path=None, mode: Tuple[str, None] = FASTQUANT, *args, tokenizer=None, *
         return onnx.initONNXFile(path, tokenizer, *args, **kwargs)
 
     if mode is None:
-        mode: str = inquirer.prompt([inquirer.List('mode',
-                                                   message="What inference backend do you want to use?",
-                                                   choices=Backends.keys(),
-                                                   )])["mode"]
+        _mode = inquirer.prompt([inquirer.List(
+            'mode',
+            message="What inference backend do you want to use?",
+            choices=Backends.keys(),
+        )])
+        assert _mode is not None
+        mode: str = _mode["mode"]
 
     ops, weights = loadWeights(mode, path, *args, **kwargs)
 
