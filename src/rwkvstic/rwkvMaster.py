@@ -1,7 +1,6 @@
 
 import tqdm
 import rwkvstic.tokenizer as tokenizer
-from typing import List
 
 # this is for like, being useful
 import time
@@ -25,7 +24,7 @@ class RWKVMaster():
         self.intTensor = intTensor
         self.sampler = sampler
     logging=False
-    def forward(self, state=None, number=1, stopStrings: List[str] = ["<|endoftext|>"], stopTokens: List[int] = [0], progressLambda=(lambda args: print(args["current"],end="",flush=True)) if logging else (lambda x:x), end_adj=-990.0, **kwargs):
+    def forward(self, state=None, number=1, stopStrings: list[str] = ["<|endoftext|>"], stopTokens: list[int] = [0], progressLambda=(lambda args: print(args["current"],end="",flush=True)) if logging else (lambda x:x), end_adj=-990.0, **kwargs):
         ostate = self.myState if state is None else state
         tolens = []
         for i in range(number):
@@ -105,6 +104,7 @@ class RWKVMaster():
         return ctx, clone(state)
 
     def sample(self, ozut, temp: float = 1.0, top_p_usual: float = 0.8) -> int:
+        assert self.sampler is not None
         return self.sampler(ozut, temp, top_p_usual)
 
     def decode(self, x):
